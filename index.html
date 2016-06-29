@@ -1,0 +1,205 @@
+
+
+<!-- saved from url=(0163)file:///C:/Users/Alexander/Desktop/PSEA-Quant_%20Protein%20set%20enrichment%20analysis%20on%20label-free%20and%20label-based%20protein%20quantification%20data.html -->
+<html><head>
+	<style type="text/css">
+   	 .section {
+    	    display: none;
+    	}
+	</style>
+	<script type="text/javascript">
+    		function loading() {
+        	document.getElementById('loading').style.display="block";
+		document.getElementById('formDiv').style.display="none";
+		document.getElementById('numControlReplicates').innerHTML=document.getElementsByName('ControlReplicates')[0].value;
+	        document.getElementById('numDrugReplicates').innerHTML=document.getElementsByName('DrugReplicates')[0].value;
+		document.getElementById('numOfFractions').innerHTML=document.getElementsByName('fractions')[0].value;
+		document.getElementById('kValue').innerHTML=document.getElementsByName('kValue')[0].value;
+		document.getElementById('FDRThreshold').innerHTML=document.getElementsByName('FDRThreshold')[0].value;
+		document.getElementById('foldChangeThreshold').innerHTML=document.getElementsByName('FoldChange')[0].value;
+    	}
+	</script>
+
+	<script type="text/javascript">
+		function inputValidation(){
+			var numControlReps = document.getElementById("numControlReplicates").innderHTML=document.getElementsByName('ControlReplicates')[0].value;
+			var numDrugReps = document.getElementById('numDrugReplicates').innerHTML=document.getElementsByName('DrugReplicates')[0].value;
+			var numFracs = document.getElementById('numOfFractions').innerHTML=document.getElementsByName('fractions')[0].value;
+			var kVal = document.getElementById('kValue').innerHTML=document.getElementsByName('kValue')[0].value;
+			var FDRthresh = document.getElementById('FDRThreshold').innerHTML=document.getElementsByName('FDRThreshold')[0].value;
+			var FCthresh = document.getElementById('foldChangeThreshold').innerHTML=document.getElementsByName('FoldChange')[0].value;
+    
+			text = "";
+			if(isNaN(numControlReps) || numControlReps < 4 || numControlReps%1 != 0){
+				text += "Error with Step 1\n";
+			}
+			if(isNaN(numDrugReps) || numDrugReps < 1 || numDrugReps%1 != 0){
+				text += "Error with Step 2\n";
+			}
+			if(isNaN(numFracs) || numFracs < 2 || numFracs%1 != 0){
+				text += "Error with Step 3\n";
+			}
+			if(isNaN(kVal) || kVal < 0 || kVal%1 != 0){
+				text += "Error with Step 5\n";
+			}
+			if( isNaN(FDRthresh) || FDRthresh < 0 || FDRthresh > 1) {
+				text += "Error with Step 6\n";
+			}
+			if(isNaN(FCthresh) || FCthresh < 0) {
+				text += "Error with Step 7\n";
+			}
+
+			if(text == ""){
+				loading();
+				return true;
+			} else {
+				alert(text);
+				return false;
+			}
+		}
+	</script> 
+	<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+		<title>TargetSeeker-MS</title>
+	<style type="text/css"></style></head>
+	<body>
+
+
+	<table width="100%" cellspacing="0" cellpadding="15">
+            <tbody>
+                <tr>
+                    <td width="150">
+                        <a href="http://fields.scripps.edu/">
+				<img border="0" src="./yateslab_small.gif">
+                        </a>
+                    </td>
+                    <td style="margin:0 auto 0 auto">
+                    </td>
+                    <td width="150">
+                        <a href="http://www.scripps.edu/">
+                           <img border="0" src="./tsrilogo.gif">
+                        </a>
+                    </td>
+
+                </tr>
+            </tbody>
+        </table>
+
+
+
+        <table width="100%" cellspacing="0" cellpadding="15" bgcolor="#820004">
+            <tbody>
+                <tr>
+                    <td valign="center" nowrap="" align="center">
+			<h1>
+                        <font class="whitetitle" color="#FFFFFF">TargetSeeker-MS</font>
+			</h1>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+<!--		<h1 style="text-align: center;">
+			PSEA-Quant</h1> -->
+		<br>
+<!--enctype="multipart/form-data"-->
+			
+			<div id="formDiv">
+			 <form method="post" action="http://sealion.scripps.edu:28080/Target_Seeker/TSForm" name="submit" enctype="multipart/form-data">
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TargetSneeker-MS is a Bayesian Inference approach for drug target discovery, using protein fractionation coupled to mass spectrometry.<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;It identifies proteins that are statistically significantly enriched via generating a noise-model using Bayesian Inference, which are measured with high reproducibility across a set of replicates.
+				<br>
+				<br>
+				<!--<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;More information about TargetSeeker-MS is available <a href="http://pubs.acs.org/doi/abs/10.1021/pr500473n">here.</a>
+				<br>-->
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sample input and output files are accessible <a href="http://sealion.scripps.edu:28080/Target_Seeker/files/">here.</a>
+				<!--<br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;When using TargetSeeker-MS, please cite:<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lavallée-Adam, M., Pelletier, A., Diedrich, J., Low, W., Petrascheck, M., Moresco, J., &amp; Yates, J. R. (2016). <b>TargetSeeker-MS: A Bayesian Inference Approach for Drug Target Discovery using Protein Fractionation Coupled to Mass Spectrometry <br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b> <a href="http://pubs.acs.org/doi/abs/10.1021/pr500473n">Journal of proteome research.</a>
+				<br>
+				<br>-->
+				<hr>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 1. </font></b>Number of control replicates (at least 4):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="ControlReplicates" size="2" type="text" value="4"> <br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 2. </font></b>Number of drug replicates (recommended at least 2):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="DrugReplicates" size="2" type="text" value="3"> <br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 3. </font></b>Number of sample fractions per replicate (at least 2):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="fractions" size="2" type="text" value="10"> <br>
+				<br>			
+	
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 4. </font></b>Input data in the following tab-separated format (.txt file):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The input file header must start with Protein and follow the following fraction format: xRyFz<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Where x is "C" for control replicate or "D" for drug replicate.<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Where y is the replicate number.<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Where z is the fraction number.<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The order of the columns after "Protein" does not need to be in order.<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;However, each condition must have all replicates (1 to number of replicates) and all fractions (1 to number of fractions).<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Example:<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<em>Protein&nbsp;&nbsp;&nbsp;&nbsp;CR1F1&nbsp;&nbsp;&nbsp;&nbsp;CR1F2&nbsp;&nbsp;&nbsp;&nbsp;CR1F2&nbsp;&nbsp;&nbsp;&nbsp;...</em><br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TO8B1.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;W10C8.5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;18&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;36<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F45D11.15&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;34<br>
+				<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;See the sample input file above for a more detailed example.<br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="file" name="file"><br><br>
+
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 5. </font></b>k-nearest neighbor smoothing (integer greater than 0):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="kValue" size="3" type="text" value="20"> <br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 6. </font></b>False-Discovery Rate threshold (number between 0 and 1):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="FDRThreshold" size="5" type="text" value="0.05"> <br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><font color="#FF0000">Step 7. </font></b>Fold-change threshold (non-negative number):<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input maxlength="7" name="FoldChange" size="5" type="text" value="0.2"> <br>
+				<br>
+				&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input type="submit" name="submit" value="Submit" onclick="return inputValidation()">
+			
+			<hr>
+			&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This website is currently under development. If you encounter any problems, please contact mlaval "at" scripps "dot" edu
+
+
+
+
+
+
+
+
+
+		       <hr width="100%" size="1" noshade="" color="#CCCCCC">
+		        <div class="foot center"> 
+            		Powered by <b> Yates Bioinformatics Team</b><br>
+		            Copyright @2016 by Yates Lab, Department of Chemical Physiology, The Scripps Research Institute </div>
+	
+			
+
+
+</em></form></div>
+
+
+<div id="loading" class="section">
+Your Target-Seeker-MS results are being computed. This may take a few minutes. Please wait...
+</br>
+</br>
+</br>
+</br>
+<center>
+<img src="./loading.GIF" height="142" width="142">
+</center>
+</br>
+</br>
+</br>
+Parameters: </br>
+Number of control replicates: <div id="numControlReplicates"></div> </br>
+Number of drug replicates: <div id="numDrugReplicates"></div> </br>
+Number of fractions: <div id="numOfFractions"></div> </br>
+k-value: <div id="kValue"></div> </br>
+FDR threshold: <div id="FDRThreshold"></div> </br>
+Fold-change threshold: <div id="foldChangeThreshold"></div></br>
+</div>
+
+
+</body></html>

@@ -1,0 +1,2 @@
+An error has occured while analyzing your input file. Please refer to the example input file at this <a href="http://sealion.scripps.edu:28080/Target_Seeker/files/inputExample.txt"> address</a> for proper formatting
+If you have any questions or issues please email us at mlaval@scripps.edu

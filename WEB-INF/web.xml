@@ -1,0 +1,21 @@
+<web-app version="2.4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/j2ee" xsi:schemalocation="http:/java.sun.com/dtd/web-app_2_3.dtd">
+        <servlet>
+                <servlet-name>Target_Seeker</servlet-name>
+                <servlet-class>TargetSeekerServlet</servlet-class>
+        </servlet>
+
+        <servlet-mapping>
+                <servlet-name>Target_Seeker</servlet-name>
+                <url-pattern>/TSForm</url-pattern>
+        </servlet-mapping>
+
+<context-param>
+        <description>Location to store uploaded file</description>
+        <param-name>file-upload</param-name>
+        <param-value>
+                /home/target/tomcat/webapps/data/
+                </param-value>
+        </context-param>
+
+</web-app>
+
