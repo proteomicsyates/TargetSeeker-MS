@@ -1317,15 +1317,14 @@ public class TargetSeekerMS {
 						out.write(pValue+"\t");
 						//Pvalues are listed in decreasing order
 						out.write(falsePositiveCounter[falsePositiveCounter.length-1][2]+"\t");
-						FDRvalue = 1;
+						FDRvalue = 0;
 						hasPrinted = true;
 					} else{
 						out.write(pValue+"\t");
-						for(int i = 1; i < falsePositiveCounter.length-1; i++){
+						for(int i = 0; i < falsePositiveCounter.length-1; i++){
 							// this rounds them up. This is okay because you should not have a 0 pValue
 							if( (pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER) && (pValue > falsePositiveCounter[i+1][0]+DOUBLE_BUFFER) ){
 								//prints everything in the FPC but the column with the PValue bin
-								out.write(pValue+"\t");
 								out.write(falsePositiveCounter[i][2]+"\t");
 								FDRvalue = falsePositiveCounter[i][2];
 								hasPrinted = true;
