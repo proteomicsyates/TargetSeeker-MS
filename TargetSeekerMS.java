@@ -16,8 +16,6 @@ public class TargetSeekerMS {
 	private static final String DRUG_CONDITION = "D";
 	private static final String REPLICATE_TAG = "R";
 	private static final String FRACTION_TAG = "F";
-	private static final String CONTAMINANT = "contaminant";
-	private static final String REVERSE = "Reverse";
 	
 	/*
 	 * For removing the ProteinID's with the words contaminant and Reverse in
@@ -43,10 +41,6 @@ public class TargetSeekerMS {
 	private static Replicate[][] Condition;
 	// the new header generated from this program
 	private static String[] newHeader;
-	// keeps track of the rejected IDs
-	private static String rejectedIDs;
-	private static int rejectedCount;
-
 	// stores and formats the correlation data
 	private static Correlation correlationClass;
 	
@@ -77,6 +71,9 @@ public class TargetSeekerMS {
 	private static String output_file;
 	private static int[] controlRepArray;		
 	private static int[] drugRepArray;
+	private static List<Score> scores;
+
+	
 
 	public TargetSeekerMS(String filePathOnServer, int numControlReplicates, int numDrugReplicates,
 					  int numOfFractions, int kValue, double FDRThreshold, double foldChangeThreshold, 
@@ -134,12 +131,6 @@ public class TargetSeekerMS {
 		for(int i = 1; i<=number_drug_replicates; i++){
 			drugRepArray[i-1] = i;
 		}
-		
-		
-		// Keeps track of the ProteinIDs that were rejected (contaminant or
-		// Reverse)
-		rejectedIDs = new String();
-		rejectedCount = 0;
 
 
 		try {
@@ -203,29 +194,22 @@ public class TargetSeekerMS {
 				split = s.split("\t");
 
 				String ProteinID = split[0];
-
-				if ((ProteinID.contains(CONTAMINANT)) || (ProteinID.contains(REVERSE))) {
-					rejectedIDs += ProteinID + "\t\n";
-					rejectedCount++;
-				} else {
-					// i keeps track of the condition number
-					// j keeps track of the rep number
-					// k keeps track of the frac number
-					for (int i = 0; i < numConditions; i++) {
-						for (int j = 0; j < Condition[i].length; j++) {//TODO
-
-							int[] fracOrder = Condition[i][j].fracOrder();
-							List<Double> specData = new ArrayList<Double>();
-
-							for (int k = 0; k < number_fractions; k++) {
-								//System.out.println("("+i+", "+j+", "+k+"): "+fracOrder[k]);
-								specData.add(Double.parseDouble(split[fracOrder[k]]));
-							}
-
-							// loads spec data into the correct rep
-							Condition[i][j].loadSpecCounts(ProteinID, specData);
+				
+				// i keeps track of the condition number
+				// j keeps track of the rep number
+				// k keeps track of the frac number
+				for (int i = 0; i < numConditions; i++) {
+					for (int j = 0; j < Condition[i].length; j++) {
+						int[] fracOrder = Condition[i][j].fracOrder();
+						List<Double> specData = new ArrayList<Double>();
+						for (int k = 0; k < number_fractions; k++) {
+							specData.add(Double.parseDouble(split[fracOrder[k]]));
 						}
+
+						// loads spec data into the correct rep
+						Condition[i][j].loadSpecCounts(ProteinID, specData);
 					}
+					
 				}
 
 				
@@ -257,6 +241,8 @@ public class TargetSeekerMS {
 			
 			computeFDRversusPreictions();
 			System.out.println("Done with calculations");
+
+			sortByFDR();
 			
 			write(output_file);
 			in.close();
@@ -845,12 +831,6 @@ public class TargetSeekerMS {
 				Hashtable<String, double[]> includeTable) {
 		double[][] frequencyMatrix = new double[WINDOW_SIZE][WINDOW_SIZE];
 		
-		//for debugging
-		final int x = 62; // index for corr_cont_x_y (include)
-		final int y = 85; // index for corr_cont_avg_exclude (exclude)
-		// TODO (98, 87) (62, 85)
-		int count = 0;
-		
 		for (String proteinID : proteinIDSet) { 
 			//exclude table holds all the values of Corr_cont_avg_EXCLUDE_x_y
 			//include table holds all the values of Corr_cont_x_y
@@ -859,12 +839,6 @@ public class TargetSeekerMS {
 			double[] include = includeTable.get(proteinID);
 			//exclude stands for the average correlation (excluding the value of include)
 			//include is the correlation value we are adding for a given average (exclude)
-			
-			/*if(proteinID.equals("R10D12.14a")){
-				System.out.println("exclude[7] = "+exclude[7]+", include[7] = "+include[7]);
-				System.out.println("exclude[7] == 0.85 is "+(exclude[7] == 0.85));
-				System.out.println("include[7] == 0.625 is "+(include[7] == 0.625));
-			}*/
 
 			for (int i = 0; i < exclude.length; i++) {
 				// finds the bin for exclude
@@ -890,71 +864,7 @@ public class TargetSeekerMS {
 						if ((exclude[i] > lowerBound) && (exclude[i] <= upperBound)) {
 							frequencyMatrix[k] = addFrequency(frequencyMatrix[k], include[i]); // adds
 																							// include
-
-						int printK = 0;
-						if(((include[i] <= 1) && (include[i] > .98)) && (k==printK)){
-
-							System.out.println((++count)+" "+proteinID);
-							
-						}
-						
-							//****** TEST CODE FOR PRINTING				
-							/*if ((include[i]>=(0.0-DOUBLE_BUFFER))&&(include[i]<=(1.0+DOUBLE_BUFFER))){
-								for (int l = 0; l < WINDOW_SIZE; l++) {
-									double lowerBound1;
-									double upperBound1;
-									
-									if(l == 0){
-										lowerBound1 = (0.0-DOUBLE_BUFFER);
-									} else {
-										lowerBound1 = 0.00 + (STEP_SIZE * (l));
-									}
-									
-									if( l == WINDOW_SIZE-1){
-										upperBound1 = (1.0+DOUBLE_BUFFER);
-									} else {
-										upperBound1 = 0.00 + (STEP_SIZE * (l+1) );	
-									}
-									
-									if ((include[i] > lowerBound1) && (include[i] <= upperBound1)) {
-										if( (k == y) && (l == x) ){
-											System.out.println( "(x, y) = ("+x+", " + y+") = "+frequencyMatrix[k] +" exlude[i] = " +exclude[i] + " include[i] " + include[i]+" for proteinID "+proteinID);
-										}
-									}
-								}
-							} */
-							/*if ((include[i] >= -(1.0+DOUBLE_BUFFER) ) && (include[i] < -STEP_SIZE)) {
-								for (int l = 0; l < WINDOW_SIZE; l++) {
-									double lowerBoundl = -1.00 + (STEP_SIZE * l);
-									double upperBoundl = lowerBoundl + STEP_SIZE;
-									if ((include[i] >= lowerBoundl) && (include[i] < upperBoundl)) {
-									
-										if( (l == 62) && (k == 85) ){ 
-											System.out.println( "(k, l) = ("+k+", " + l+") = "+frequencyMatrix[k] +" exlude[i] = " +exclude[i] + " include[i] " + include[i] );
-										}
-									}
-								}
-							} 
-							else if ((include[i] > STEP_SIZE) && (include[i] <= (1.0+DOUBLE_BUFFER))) {
-								for (int l = WINDOW_SIZE + 1; l <= (2 * WINDOW_SIZE); l++) {
-									double lowerBoundl = -1.00 + (STEP_SIZE * (l - 1));
-									double upperBoundl = lowerBoundl + STEP_SIZE;
-									if ((include[i] > lowerBoundl) && (include[i] <= upperBoundl)) {
-									
-										if( (l == 62)  && (k == 85) ){ 
-											System.out.println( "(k, l) = ("+k+", " + l+") = "+frequencyMatrix[k] +" exlude[i] = " +exclude[i] + " include[i] " + include[i]);
-										}
-									}
-								}
-							}*/
-							
-						
-							//****** TEST CODE FOR PRINTING ENDS
-						
-						}
-						
-						
-						
+						}			
 						
 					}
 				} 
@@ -1148,23 +1058,8 @@ public class TargetSeekerMS {
 				if (!isNA) {
 					double probability = averageProbability[i];
 					for (int j : binList) {
-						//System.out.println("(i,j) = ("+i+", "+j+")");
 						probability *= probabilityMatrix[i][j];
-						
-
-					    
-						//TODO
 					}
-					
-				    /*System.out.println("binList for i = "+i+": ");
-				    for(int j : binList){
-				    	System.out.print(j+" = "+probabilityMatrix[i][j]+"\t");
-				    }
-				    System.out.println();
-				    for(double d: probabilityMatrix[i]){
-				    	System.out.print(d+"\t");
-				    }
-				    System.out.println();*/
 				    
 					conditionalProbability[i] = probability;
 				} else {
@@ -1212,17 +1107,6 @@ public class TargetSeekerMS {
 
 			output.put(proteinID, pValue);
 			
-			//code for printing out distribution for figures 3-24-16
-			/*if(proteinID.equals("F45D11.15")){
-				System.out.println("Protein "+proteinID+" has a pValue of "+pValue+
-						" which is in bin number "+(getBinNum(targetValue)));
-				for (int i = 0; i < range.length; i++) {
-					System.out.print(range[i]+"\t");
-				}	
-				System.out.println();
-			} */
-			// end code
-			
 		}
 
 		return output;
@@ -1250,7 +1134,7 @@ public class TargetSeekerMS {
 
 	}
 
-	private static double computeCorrelation(List<Double> specCountsCond1, List<Double> specCountsCond2) { //TODO
+	private static double computeCorrelation(List<Double> specCountsCond1, List<Double> specCountsCond2) { 
 		//unique to this class. Actually computes 1-Euclidean distance
 		double euclidianDistance = 0;
 		double sum = 0;
@@ -1278,6 +1162,35 @@ public class TargetSeekerMS {
 		}
 	}
 
+	// Sorts by FDR
+	private static void sortByFDR(){
+		scores = new ArrayList<Score>();
+		Hashtable<String,Double> pValueTable = drugTable.getProteinNoisePValue();
+			
+		for(String proteinID: proteinIDSet){	
+			//PValue and FDR
+			double pValue = pValueTable.get(proteinID);
+			//FDR is 2, so it is sorted accordingly
+			double FDRvalue = 2;
+			
+			if( (pValue > (0-DOUBLE_BUFFER)) && (pValue <= (1.0+DOUBLE_BUFFER))){
+				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
+					FDRvalue = falsePositiveCounter[falsePositiveCounter.length-1][2];
+				} else{
+					for(int i = 0; i < falsePositiveCounter.length-1; i++){
+						if( (pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER) && (pValue > falsePositiveCounter[i+1][0]+DOUBLE_BUFFER) ){
+							FDRvalue = falsePositiveCounter[i][2];
+						}
+					}	
+				}
+						
+			}
+			scores.add(new Score(FDRvalue,proteinID));
+		}
+		Collections.sort(scores);
+	
+	}
+
 	/*
 	 * Writes the output file. You can toggle whether to print: - spec values -
 	 * frequency matrix - smoothed frequency matrix - probability matrix -
@@ -1294,8 +1207,9 @@ public class TargetSeekerMS {
 				
 			Hashtable<String,Double> targetTable = drugTable.getTargetTable();
 			Hashtable<String,Double> pValueTable = drugTable.getProteinNoisePValue();
-				
-			for(String proteinID: proteinIDSet){
+			
+			for(Score score: scores){
+				String proteinID = score.proteinID;
 				out.write(proteinID+"\t");
 					
 				//corrDCAVG
@@ -1308,39 +1222,18 @@ public class TargetSeekerMS {
 					
 				//PValue and FDR
 				double pValue = pValueTable.get(proteinID);
-				double FDRvalue = -2;
-				boolean hasPrinted = false;
+				double FDRvalue = score.FDR;
+				
 				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue <= (1.0+DOUBLE_BUFFER))){
-							
-					if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
-						// commented out because we don't think a pValue will be 0 (on 2-2-16)
-						out.write(pValue+"\t");
-						//Pvalues are listed in decreasing order
-						out.write(falsePositiveCounter[falsePositiveCounter.length-1][2]+"\t");
-						FDRvalue = 0;
-						hasPrinted = true;
-					} else{
-						out.write(pValue+"\t");
-						for(int i = 0; i < falsePositiveCounter.length-1; i++){
-							// this rounds them up. This is okay because you should not have a 0 pValue
-							if( (pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER) && (pValue > falsePositiveCounter[i+1][0]+DOUBLE_BUFFER) ){
-								//prints everything in the FPC but the column with the PValue bin
-								out.write(falsePositiveCounter[i][2]+"\t");
-								FDRvalue = falsePositiveCounter[i][2];
-								hasPrinted = true;
-							}
-						}	
+					if( (FDRvalue > (0-DOUBLE_BUFFER)) && (FDRvalue <= (1.0+DOUBLE_BUFFER))){
+						out.write(pValue+"\t"+FDRvalue+"\t");		
+					} else {
+						out.write(pValue+"\t"+"N/A\t");
 					}
-						
 				} else{
 					for(int j = 0; j < 2; j++){
 						out.write("N/A\t");
 					}
-					hasPrinted = true;
-				}
-					
-				if(!hasPrinted){
-					System.out.println("Protein ID " + proteinID + " failed to print");
 				}
 					
 				//prints fold change value
