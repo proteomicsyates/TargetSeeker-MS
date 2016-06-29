@@ -16,6 +16,8 @@ public class TargetSeekerMS {
 	private static final String DRUG_CONDITION = "D";
 	private static final String REPLICATE_TAG = "R";
 	private static final String FRACTION_TAG = "F";
+	private static final String CONTAMINANT = "contaminant";
+	private static final String REVERSE = "Reverse";
 	
 	/*
 	 * For removing the ProteinID's with the words contaminant and Reverse in
@@ -195,23 +197,26 @@ public class TargetSeekerMS {
 
 				String ProteinID = split[0];
 				
-				// i keeps track of the condition number
-				// j keeps track of the rep number
-				// k keeps track of the frac number
-				for (int i = 0; i < numConditions; i++) {
-					for (int j = 0; j < Condition[i].length; j++) {
-						int[] fracOrder = Condition[i][j].fracOrder();
-						List<Double> specData = new ArrayList<Double>();
-						for (int k = 0; k < number_fractions; k++) {
-							specData.add(Double.parseDouble(split[fracOrder[k]]));
+				if (!((ProteinID.contains(CONTAMINANT)) || (ProteinID.contains(REVERSE)))) {
+					// i keeps track of the condition number
+					// j keeps track of the rep number
+					// k keeps track of the frac number
+					for (int i = 0; i < numConditions; i++) {
+						for (int j = 0; j < Condition[i].length; j++) {//TODO
+
+							int[] fracOrder = Condition[i][j].fracOrder();
+							List<Double> specData = new ArrayList<Double>();
+
+							for (int k = 0; k < number_fractions; k++) {
+								//System.out.println("("+i+", "+j+", "+k+"): "+fracOrder[k]);
+								specData.add(Double.parseDouble(split[fracOrder[k]]));
+							}
+
+							// loads spec data into the correct rep
+							Condition[i][j].loadSpecCounts(ProteinID, specData);
 						}
-
-						// loads spec data into the correct rep
-						Condition[i][j].loadSpecCounts(ProteinID, specData);
 					}
-					
 				}
-
 				
 				s = in.readLine();
 			}
