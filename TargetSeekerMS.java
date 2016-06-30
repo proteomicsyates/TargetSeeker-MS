@@ -16,13 +16,7 @@ public class TargetSeekerMS {
 	private static final String DRUG_CONDITION = "D";
 	private static final String REPLICATE_TAG = "R";
 	private static final String FRACTION_TAG = "F";
-	private static final String CONTAMINANT = "contaminant";
-	private static final String REVERSE = "Reverse";
 	
-	/*
-	 * For removing the ProteinID's with the words contaminant and Reverse in
-	 * the name e.g. contaminant_GR72_TOBAC Reverse_sp|Q9P281|BAHC1_HUMAN
-	 */
 	private static final int WINDOW_SIZE = 100; // bins for the distribution
 	private static final double STEP_SIZE = .01; // step size for the distribution
 	private static final double FPT_STEP_SIZE = .0001;
@@ -197,26 +191,21 @@ public class TargetSeekerMS {
 
 				String ProteinID = split[0];
 				
-				if (!((ProteinID.contains(CONTAMINANT)) || (ProteinID.contains(REVERSE)))) {
-					// i keeps track of the condition number
-					// j keeps track of the rep number
-					// k keeps track of the frac number
-					for (int i = 0; i < numConditions; i++) {
-						for (int j = 0; j < Condition[i].length; j++) {//TODO
-
-							int[] fracOrder = Condition[i][j].fracOrder();
-							List<Double> specData = new ArrayList<Double>();
-
+				// i keeps track of the condition number
+				// j keeps track of the rep number
+				// k keeps track of the frac number
+				for (int i = 0; i < numConditions; i++) {
+					for (int j = 0; j < Condition[i].length; j++) {
+						int[] fracOrder = Condition[i][j].fracOrder();
+						List<Double> specData = new ArrayList<Double>();
 							for (int k = 0; k < number_fractions; k++) {
-								//System.out.println("("+i+", "+j+", "+k+"): "+fracOrder[k]);
-								specData.add(Double.parseDouble(split[fracOrder[k]]));
-							}
-
-							// loads spec data into the correct rep
-							Condition[i][j].loadSpecCounts(ProteinID, specData);
+							specData.add(Double.parseDouble(split[fracOrder[k]]));
 						}
+							// loads spec data into the correct rep
+						Condition[i][j].loadSpecCounts(ProteinID, specData);
 					}
 				}
+				
 				
 				s = in.readLine();
 			}
@@ -342,7 +331,6 @@ public class TargetSeekerMS {
 				// adds the protein to the list of valid proteinIDs if it has a valid pValue
 				validProteinIDs.add(proteinID);
 				
-				//WE do not know what this does
 				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
 					// special case for FDR of 0
 					FDRValue = 0;
@@ -351,7 +339,6 @@ public class TargetSeekerMS {
 				// iterates every value in the FDR counter lower than the current FDR value
 				for(int i = FDRList.size()-1; i >= 0; i--){
 					if( FDRValue <= FDRList.get(i) ){
-						//System.out.println("FDRValue = "+FDRValue+"\nFDRList.get(i) = "+FDRList.get(i));
 						FDRCounter[i]++;
 					} else{
 						break;
@@ -377,68 +364,6 @@ public class TargetSeekerMS {
 			FDRversusPredictions[i] = new double[]{FDRList.get(i), FDRCounter[i]};
 		}
 	}
-
-	// determines how many control and how many drug reps there are
-/*	private static void setReps(String[] header) {
-		if(PRESET_REPS){ // pre-determined number of reps
-			controlRepArray = new int[]{2,3,4,5};
-			drugRepArray = new int[]{2,3}; 
-			
-			// makes the description accessible
-			descriptionIndex = 0;
-			for (int i = 0; i < header.length; i++) {
-				String s = header[i];
-				if(s.contains(DESCRIPTION)){
-					descriptionIndex = i;
-				}
-			}
-
-		} else{ // determines how many reps from the file header
-			List<Integer> controlReplicates = new ArrayList<Integer>();
-			List<Integer> drugReplicates = new ArrayList<Integer>();
-			descriptionIndex = 0;
-
-			for (int i = 0; i < header.length; i++) {
-				String s = header[i];
-				// only considered if it contains "spectral_count"
-				if (s.contains(SPEC_TAG)) {
-					// divides the spec header by _
-					// will look like: spectral_count_Cond_X_Rep_Y_Frac_Z"
-					// 0 1 2 3 4 5 6 7
-					String[] dividedSpecHeader = s.split("_");
-					String condition = dividedSpecHeader[3];
-					String replicate = dividedSpecHeader[5];
-
-					if (condition.equals(CONTROL_CONDITION)) {
-						if (!(controlReplicates.contains(Integer.parseInt(replicate)))) {
-							controlReplicates.add(Integer.parseInt(replicate));
-						}
-					} else if (condition.equals(DRUG_CONDITION)) {
-						if (!(drugReplicates.contains(Integer.parseInt(replicate)))) {
-							drugReplicates.add(Integer.parseInt(replicate));
-						}
-					}
-				}
-				
-				if(s.contains(DESCRIPTION)){
-					descriptionIndex = i;
-				}
-			}
-
-			// makes sure they are ascending order
-			Collections.sort(controlReplicates);
-			Collections.sort(drugReplicates);
-
-			// adds elements into the array
-			for (int i = 0; i < controlReplicates.size(); i++) {
-				controlRepArray[i] = controlReplicates.get(i);
-			}
-
-			for (int i = 0; i < drugReplicates.size(); i++) {
-				drugRepArray[i] = drugReplicates.get(i);
-			}
-		}
-	}*/
 
 	// All correlation calculations are done here
 	private static void setUpCorrelationClass() {
@@ -505,17 +430,7 @@ public class TargetSeekerMS {
 
 	// adds frequency to the correct bin
 	private static double[] addFrequency(double[] distribution, double correlation) {
-		// Three way split:
-		// ** From -1.00 to (but not including) -STEP_SIZE
-		// ** From -STEP_SIZE to STEP_SIZE
-		// ** From STEP_SIZE (but not including) to 1.00
-		// Steps through each bin and increments if the correlation is in the
-		// bin. For WINDOW_SIZE 100 and STEP_SIZE .1 :
-		// **bins 0 to 99, bin 100, bins 101 to 200. 201 bins total
-		
-		//CHANGED 2-16-16 only from 0 to 1.00 now
 		// ** bins 0 to 99. 100 total
-
 		if ((correlation>=(0.0-DOUBLE_BUFFER))&&(correlation<=(1.0+DOUBLE_BUFFER))){
 			for (int i = 0; i < WINDOW_SIZE; i++) {
 				double lowerBound;
