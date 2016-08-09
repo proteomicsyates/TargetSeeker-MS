@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class TargetSeekerMS {
@@ -16,16 +18,17 @@ public class TargetSeekerMS {
 	private static final String DRUG_CONDITION = "D";
 	private static final String REPLICATE_TAG = "R";
 	private static final String FRACTION_TAG = "F";
-	
+
 	private static final int WINDOW_SIZE = 100; // bins for the distribution
-	private static final double STEP_SIZE = .01; // step size for the distribution
+	private static final double STEP_SIZE = .01; // step size for the
+													// distribution
 	private static final double FPT_STEP_SIZE = .0001;
 	private static final int FPT_WINDOW_SIZE = 10000;
 	private static final double FPT_SMALLER_STEP_SIZE = .000001;
 	// to resolve sticky bit double errors
 	private static final double DOUBLE_BUFFER = 0.00000001;
 	// the number of conditions should always be 2
-	private static final int AVG = 100; 
+	private static final int AVG = 100;
 	// how to signal for Correlation class that you want the average
 	private static final int numConditions = 2;
 	private static final int SPEC_COUNT_THRESHOLD = 5;
@@ -39,8 +42,8 @@ public class TargetSeekerMS {
 	private static String[] newHeader;
 	// stores and formats the correlation data
 	private static Correlation correlationClass;
-	
-	//stores the distribution, probability, and pvalue items
+
+	// stores the distribution, probability, and pvalue items
 	private static ResultTable drugTable;
 	private static ResultTable[] falsePositiveTable;
 	private static double[][] falsePositiveCounter;
@@ -49,47 +52,59 @@ public class TargetSeekerMS {
 	private static Hashtable<String, Double> foldChange;
 	private static ArrayList<String> validProteinIDs;
 	private static ArrayList<String> targetProteinIDs;
-	
-	private static String file_name;				// "Wormdata.txt", "HEKdata.txt", or "Heatdata.txt"
-	private static int number_control_replicates;	// 4 or 6 for worm, 4 for HEK, 4 for Heat
-	private static int number_drug_replicates;		// 3 for worm, 2 for HEK, 2 for Heat
-	private static int number_fractions;			// 10 by default
-	private static int k_value;						// 20 by default
-	private static double FDR_threshold;			// 0.05 by default
-	private static double fold_change_threshold;	// 0.2 by default
-	/* controlRepArray and drugRepArray were created to quickly fix an artifact of the
-	 * program, involving leaving out certain replicates. (e.g. throwing out replicate 1
-	 * out of 6 replicates, would have an array [2,3,4,5,6]) We expect the number of
-	 * replicates from our users to be contiguous. Having this properly fixed would not
-	 * be worth the time and effort, as it is trivial. For old code dealing with this
-	 * artifact, see function setReps().
+
+	private static String file_name; // "Wormdata.txt", "HEKdata.txt", or
+										// "Heatdata.txt"
+	private static int number_control_replicates; // 4 or 6 for worm, 4 for HEK,
+													// 4 for Heat
+	private static int number_drug_replicates; // 3 for worm, 2 for HEK, 2 for
+												// Heat
+	private static int number_fractions; // 10 by default
+	private static int k_value; // 20 by default
+	private static double FDR_threshold; // 0.05 by default
+	private static double fold_change_threshold; // 0.2 by default
+	/*
+	 * controlRepArray and drugRepArray were created to quickly fix an artifact
+	 * of the program, involving leaving out certain replicates. (e.g. throwing
+	 * out replicate 1 out of 6 replicates, would have an array [2,3,4,5,6]) We
+	 * expect the number of replicates from our users to be contiguous. Having
+	 * this properly fixed would not be worth the time and effort, as it is
+	 * trivial. For old code dealing with this artifact, see function setReps().
 	 */
 	private static String output_file;
-	private static int[] controlRepArray;		
+	private static int[] controlRepArray;
 	private static int[] drugRepArray;
 	private static List<Score> scores;
 
-	
+	/*
+	 * This object detects errors in the file to be output accordingly
+	 */
+	private static Map<String, Boolean> errorHandler;
+	private static int err_handling_line;
+	private static int[] err_handling_num_format_exception;
 
-	public TargetSeekerMS(String filePathOnServer, int numControlReplicates, int numDrugReplicates,
-					  int numOfFractions, int kValue, double FDRThreshold, double foldChangeThreshold, 
-					  String outputFile){
-		/* Format: 
-		 * 		input_file: .txt file containing spectral counts separated by tabs.
-		 * 			File should follow the following naming convention for header:
-		 * 			Protein	CR1F1	CR1F2	... DRxFy
-		 * 		number_control_replicates: the number of control replicates (integer > 4)
-		 * 		number_drug_replicates: the number of drug replicates (integer > 0)
-		 * 		number_fractions: the number of fractions in each replicate (integer > 2)
-		 * 		k_value: the k-nearest-neighbor smoothing factor (integer > 0)
-		 * 		FDR_threshold: the FDR cut-off for determining significant protein.
-		 * 			Any proteins with an FDR higher than this threshold are considered
-		 * 		 	not significant. 
-		 * 		fold_change_threshold: the fold-change threshold for determining 
-		 * 			significant protein. Any proteins with a fold-change less than this
-		 * 			threshold are considered not significant.
+	private static String inputParameters;
+
+	// from TargetSeekerServlet to have a definite length of appended ints
+	private static int lengthOfFileExtension = 9;
+
+	public TargetSeekerMS(String filePathOnServer, int numControlReplicates, int numDrugReplicates, int numOfFractions,
+			int kValue, double FDRThreshold, double foldChangeThreshold, String outputFile) {
+		/*
+		 * Format: input_file: .txt file containing spectral counts separated by
+		 * tabs. File should follow the following naming convention for header:
+		 * Protein CR1F1 CR1F2 ... DRxFy number_control_replicates: the number
+		 * of control replicates (integer > 4) number_drug_replicates: the
+		 * number of drug replicates (integer > 0) number_fractions: the number
+		 * of fractions in each replicate (integer > 2) k_value: the
+		 * k-nearest-neighbor smoothing factor (integer > 0) FDR_threshold: the
+		 * FDR cut-off for determining significant protein. Any proteins with an
+		 * FDR higher than this threshold are considered not significant.
+		 * fold_change_threshold: the fold-change threshold for determining
+		 * significant protein. Any proteins with a fold-change less than this
+		 * threshold are considered not significant.
 		 */
-		
+
 		file_name = filePathOnServer;
 		number_control_replicates = numControlReplicates;
 		number_drug_replicates = numDrugReplicates;
@@ -98,36 +113,56 @@ public class TargetSeekerMS {
 		FDR_threshold = FDRThreshold;
 		fold_change_threshold = foldChangeThreshold;
 		output_file = outputFile;
+
+		inputParameters = "File name: " + getFileName(file_name) + "\n";
+		inputParameters += "Number of Control Replicates: " + number_control_replicates + "\n";
+		inputParameters += "Number of Drug Replicates: " + number_drug_replicates + "\n";
+		inputParameters += "Number of Fractions: " + number_fractions + "\n";
+		inputParameters += "k-value: " + k_value + "\n";
+		inputParameters += "FDR and fold-change thresholds for significance: FDR < " + FDR_threshold
+				+ "; fold-change >= " + fold_change_threshold + "\n";
+		inputParameters += "\n";
+
 	}
-	
+
+	private String getFileName(String file_name2) {
+		// lengthOfFileExtension is the length of the appended ints
+		String[] split = file_name2.split("/");
+		String name = split[split.length - 1];
+		return name.substring(0, name.length() - lengthOfFileExtension - 1);
+	}
+
 	public void run() {
-		
-		/* This was how the program was run from the terminal, before it was implemented as an object
-		if(args[0].length() < 7){
-			System.err.println("Incorrect usage.\nusage: java TargetSeekerMS <input_file>"+
-					" <number_control_replicates> <number_drug_replicates> "+
-					"<number_fractions> <k_value> <FDR_threshold> <fold_change_threshold>");
-			System.exit(-1);
-		}
-		
-		file_name = args[0];
-		number_control_replicates = Integer.parseInt(args[1]);
-		number_drug_replicates = Integer.parseInt(args[2]);
-		number_fractions = Integer.parseInt(args[3]);
-		k_value = Integer.parseInt(args[4]);
-		FDR_threshold = Double.parseDouble(args[5]);
-		fold_change_threshold = Double.parseDouble(args[6]);*/
-		
+
+		/*
+		 * This was how the program was run from the terminal, before it was
+		 * implemented as an object if(args[0].length() < 7){
+		 * System.err.println(
+		 * "Incorrect usage.\nusage: java TargetSeekerMS <input_file>"+
+		 * " <number_control_replicates> <number_drug_replicates> "+
+		 * "<number_fractions> <k_value> <FDR_threshold> <fold_change_threshold>"
+		 * ); System.exit(-1); }
+		 * 
+		 * file_name = args[0]; number_control_replicates =
+		 * Integer.parseInt(args[1]); number_drug_replicates =
+		 * Integer.parseInt(args[2]); number_fractions =
+		 * Integer.parseInt(args[3]); k_value = Integer.parseInt(args[4]);
+		 * FDR_threshold = Double.parseDouble(args[5]); fold_change_threshold =
+		 * Double.parseDouble(args[6]);
+		 */
+		// System.out.println(inputParameters);
 		// set up arrays for control and drug replicates
 		controlRepArray = new int[number_control_replicates];
 		drugRepArray = new int[number_drug_replicates];
-		for(int i = 1; i<=number_control_replicates; i++){
-			controlRepArray[i-1] = i;
+		for (int i = 1; i <= number_control_replicates; i++) {
+			controlRepArray[i - 1] = i;
 		}
-		for(int i = 1; i<=number_drug_replicates; i++){
-			drugRepArray[i-1] = i;
+		for (int i = 1; i <= number_drug_replicates; i++) {
+			drugRepArray[i - 1] = i;
 		}
 
+		errorHandler = new HashMap<String, Boolean>();
+		err_handling_line = 0;
 
 		try {
 			BufferedReader in = new BufferedReader(new FileReader(new File(file_name)));
@@ -136,6 +171,11 @@ public class TargetSeekerMS {
 
 			// Stores the file header (starts with Protein)
 			String[] header = s.split("\t");
+			if (header.length == 1) {
+				errorHandler.put("Delimit", false);
+				in.close();
+				throw new IllegalArgumentException("");
+			}
 
 			// Sets up the new file header before spec count
 			ArrayList<String> headerColumnsAdded = new ArrayList<String>();
@@ -157,18 +197,20 @@ public class TargetSeekerMS {
 																// control
 																// condition
 				Control[i] = new Replicate(CONTROL_CONDITION, controlRepArray[i]);
+				errorHandler.put(Control[i].toString(), false);
 				for (int j = 0; j < number_fractions; j++) {
-					String temp = CONTROL_CONDITION + REPLICATE_TAG + controlRepArray[i] +
-							FRACTION_TAG + (j + 1);
+					String temp = CONTROL_CONDITION + REPLICATE_TAG + controlRepArray[i] + FRACTION_TAG + (j + 1);
+					errorHandler.put(temp, false);
 					newHeader[((number_fractions * i) + j + headerColumnsAdded.size())] = temp;
 				}
 			}
 			for (int i = 0; i < drugRepArray.length; i++) { // sets up the drug
 															// condition
 				Drug[i] = new Replicate(DRUG_CONDITION, drugRepArray[i]);
+				errorHandler.put(Drug[i].toString(), false);
 				for (int j = 0; j < number_fractions; j++) {
-					String temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[i] +
-							FRACTION_TAG + (j + 1);
+					String temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[i] + FRACTION_TAG + (j + 1);
+					errorHandler.put(temp, false);
 					newHeader[((controlRepArray.length * number_fractions) + (number_fractions * i) + j
 							+ headerColumnsAdded.size())] = temp;
 				}
@@ -179,75 +221,134 @@ public class TargetSeekerMS {
 			if (header != null) {
 				for (int i = 0; i < numConditions; i++) {
 					for (int j = 0; j < Condition[i].length; j++) {
-						Condition[i][j].setOrder(header, number_fractions);
+						Boolean successfulSetOrder = Condition[i][j].setOrder(header, number_fractions);
+						errorHandler.put(Condition[i][j].toString(), successfulSetOrder);
+					}
+				}
+				for (int i = 0; i < numConditions; i++) {
+					for (int j = 0; j < Condition[i].length; j++) {
+						if (!errorHandler.get(Condition[i][j].toString())) {
+							in.close();
+							throw new IllegalArgumentException("");
+						}
 					}
 				}
 			}
 
 			// Adds the spec count data
 			s = in.readLine();
-			while (s != null) {
-				split = s.split("\t");
+			err_handling_line++;
 
-				String ProteinID = split[0];
-				
-				// i keeps track of the condition number
-				// j keeps track of the rep number
-				// k keeps track of the frac number
-				for (int i = 0; i < numConditions; i++) {
-					for (int j = 0; j < Condition[i].length; j++) {
-						int[] fracOrder = Condition[i][j].fracOrder();
-						List<Double> specData = new ArrayList<Double>();
+			while (s != null) {
+				if (!s.equals("")) {
+					// reset errorHandler for fractions
+					for (int i = 0; i < numConditions; i++) {
+						for (int j = 0; j < Condition[i].length; j++) {
 							for (int k = 0; k < number_fractions; k++) {
-							specData.add(Double.parseDouble(split[fracOrder[k]]));
+								String temp;
+								if (i == 0) {
+									temp = CONTROL_CONDITION + REPLICATE_TAG + controlRepArray[i] + FRACTION_TAG
+											+ (j + 1);
+								} else {
+									temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[i] + FRACTION_TAG + (j + 1);
+								}
+								errorHandler.put(temp, false);
+							}
 						}
+					}
+
+					split = s.split("\t");
+					if (split.length == 1) {
+						errorHandler.put("Delimit", false);
+						in.close();
+						throw new IllegalArgumentException("");
+					}
+
+					String ProteinID = split[0];
+					// i keeps track of the condition number
+					// j keeps track of the rep number
+					// k keeps track of the frac number
+					for (int i = 0; i < numConditions; i++) {
+						for (int j = 0; j < Condition[i].length; j++) {
+							int[] fracOrder = Condition[i][j].fracOrder();
+							List<Double> specData = new ArrayList<Double>();
+							for (int k = 0; k < number_fractions; k++) {
+								err_handling_num_format_exception = new int[] { i, j, k };
+								specData.add(Double.parseDouble(split[fracOrder[k]]));
+								String temp;
+								if (i == 0) {
+									temp = CONTROL_CONDITION + REPLICATE_TAG + controlRepArray[j] + FRACTION_TAG
+											+ (k + 1);
+								} else {
+									temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[j] + FRACTION_TAG + (k + 1);
+								}
+								errorHandler.put(temp, true);
+							}
+
 							// loads spec data into the correct rep
-						Condition[i][j].loadSpecCounts(ProteinID, specData);
+							Condition[i][j].loadSpecCounts(ProteinID, specData);
+						}
 					}
 				}
-				
-				
 				s = in.readLine();
+				err_handling_line++;
 			}
+			err_handling_line = -2;
+			in.close();
+		} catch (NumberFormatException e) {
+			writeErrorNumFormatting(output_file, err_handling_num_format_exception);
+			e.printStackTrace();
+			return;
+		} catch (ArrayIndexOutOfBoundsException e) {
+			writeErrorOutOfBounds(output_file, err_handling_num_format_exception);
+			e.printStackTrace();
+			return;
+		} catch (Exception e) {
+			writeError(output_file);
+			e.printStackTrace();
+			return;
+		}
+
+		try {
 			proteinIDSet = Condition[0][0].getProteinIDtoSpecCountVectors().keySet();
 
 			// sets spec and frac abundance
-			for (int i = 0; i < controlRepArray.length; i++) { 
+			for (int i = 0; i < controlRepArray.length; i++) {
 				Condition[0][i].setAbundance();
 			}
-			for (int i = 0; i < drugRepArray.length; i++) { 
+			for (int i = 0; i < drugRepArray.length; i++) {
 				Condition[1][i].setAbundance();
 			}
-			
-			//set spec count threshold
+
+			// set spec count threshold
 			Condition[0][0].setSpecCountThreshold(SPEC_COUNT_THRESHOLD);
-			
+
 			// This normalizes each replicate across the proteinID. This is new.
 			normalizeReplicatesAcrossProteinID();
-			
+
 			// Computes correlation values
 			setUpCorrelationClass();
-
 			computeDrugTable();
 			computeFalsePositiveTable();
 			drugTable.setFalsePositiveCounter(falsePositiveCounter);
 			calculateFoldChange();
-			
+
 			computeFDRversusPreictions();
 			System.out.println("Done with calculations");
 
 			sortByFDR();
-			
+
 			write(output_file);
-			in.close();
 			System.out.println("done");
 		} catch (Exception e) {
+			writeError(output_file);
 			e.printStackTrace();
+			return;
 		}
 
 	}
 
-	//unique for this class
+	// unique for this class
 	private static void normalizeReplicatesAcrossProteinID() {
 		for (int i = 0; i < numConditions; i++) {
 			for (int j = 0; j < Condition[i].length; j++) {
@@ -255,113 +356,119 @@ public class TargetSeekerMS {
 			}
 		}
 	}
-	
-	// keeps track of how much the drug changed the protein 
+
+	// keeps track of how much the drug changed the protein
 	// flags true if the change is larger than the fold change threshold
 	private static void calculateFoldChange() {
 		foldChange = new Hashtable<String, Double>();
-		
-		for(String proteinID: proteinIDSet){
-			
+
+		for (String proteinID : proteinIDSet) {
+
 			double Corr_cont_avg = correlationClass.getCorrCont(proteinID, AVG, AVG);
 			double Corr_D_avg_C_avg = correlationClass.getCorrDCRepXRepY(proteinID, AVG, AVG);
-			
+
 			double diff;
-			if( (Corr_D_avg_C_avg > 0+DOUBLE_BUFFER) && (Corr_cont_avg > 0-DOUBLE_BUFFER)){
-				diff = (Math.abs(Corr_cont_avg-Corr_D_avg_C_avg)/Corr_D_avg_C_avg);
-			} else{
+			if ((Corr_D_avg_C_avg > 0 + DOUBLE_BUFFER) && (Corr_cont_avg > 0 - DOUBLE_BUFFER)) {
+				diff = (Math.abs(Corr_cont_avg - Corr_D_avg_C_avg) / Corr_D_avg_C_avg);
+			} else {
 				diff = -2;
 			}
-				
+
 			foldChange.put(proteinID, diff);
-				
+
 		}
 		drugTable.setFoldChange(foldChange, fold_change_threshold);
-		
+
 	}
 
 	// for the purpose of the FDR versus Predictions graph
-	// for every FDR value, the number of proteins that have an FDR less than the given value is counted.
+	// for every FDR value, the number of proteins that have an FDR less than
+	// the given value is counted.
 	private static void computeFDRversusPreictions() {
-		//to choose which FRD method you want. 2 for method 1, 3 for method 2.
+		// to choose which FRD method you want. 2 for method 1, 3 for method 2.
 		int FDRindex = 2;
-		
+
 		// validProteinIDs keeps track of which proteinIDs have valid pValues
-		// targetProteinIDs keeps track of the proteinIDs that are under the FDR theshold
+		// targetProteinIDs keeps track of the proteinIDs that are under the FDR
+		// theshold
 		validProteinIDs = new ArrayList<String>();
 		targetProteinIDs = new ArrayList<String>();
-		
-		//a list of unique FDR values, which will be sorted
+
+		// a list of unique FDR values, which will be sorted
 		ArrayList<Double> FDRList = new ArrayList<Double>();
 		FDRList.add(0.0);
-		for(double[] d: falsePositiveCounter){
-			if(!(FDRList.contains(d[FDRindex]))){
+		for (double[] d : falsePositiveCounter) {
+			if (!(FDRList.contains(d[FDRindex]))) {
 				FDRList.add(d[FDRindex]);
 			}
 		}
 		Collections.sort(FDRList);
-		
+
 		int[] FDRCounter = new int[FDRList.size()];
 		Hashtable<String, Double> proteinIDtoFDR = new Hashtable<String, Double>();
 
-		for(String proteinID: proteinIDSet){
-			//pValue is necessary for grabbing the FDR
+		for (String proteinID : proteinIDSet) {
+			// pValue is necessary for grabbing the FDR
 			double pValue = drugTable.getProteinNoisePValue().get(proteinID);
 			double FDRValue = 0;
 
-			if(pValue == -2.0){
+			if (pValue == -2.0) {
 				proteinIDtoFDR.put(proteinID, -2.0);
 			}
-			if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
-				//pValues are listed in decreasing order
-				proteinIDtoFDR.put(proteinID,falsePositiveCounter[falsePositiveCounter.length-1][FDRindex]);
-			} else{
-				for(int i = 0; i < falsePositiveCounter.length-1; i++){
-					// this rounds them up. This is okay because you should not have a 0 pValue
-					if( (pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER) && (pValue > falsePositiveCounter[i+1][0]+DOUBLE_BUFFER) ){
-						//prints everything in the FPC but the column with the PValue bin
-						proteinIDtoFDR.put(proteinID,falsePositiveCounter[i][FDRindex]);
+			if ((pValue > (0 - DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER)) {
+				// pValues are listed in decreasing order
+				proteinIDtoFDR.put(proteinID, falsePositiveCounter[falsePositiveCounter.length - 1][FDRindex]);
+			} else {
+				for (int i = 0; i < falsePositiveCounter.length - 1; i++) {
+					// this rounds them up. This is okay because you should not
+					// have a 0 pValue
+					if ((pValue < falsePositiveCounter[i][0] + DOUBLE_BUFFER)
+							&& (pValue > falsePositiveCounter[i + 1][0] + DOUBLE_BUFFER)) {
+						// prints everything in the FPC but the column with the
+						// PValue bin
+						proteinIDtoFDR.put(proteinID, falsePositiveCounter[i][FDRindex]);
 						FDRValue = falsePositiveCounter[i][FDRindex];
-					} 
-				}	
+					}
+				}
 			}
-			
-			
-			if( (pValue >= -(0+DOUBLE_BUFFER)) && (pValue <= (1.0+DOUBLE_BUFFER))){ 
-				// adds the protein to the list of valid proteinIDs if it has a valid pValue
+
+			if ((pValue >= -(0 + DOUBLE_BUFFER)) && (pValue <= (1.0 + DOUBLE_BUFFER))) {
+				// adds the protein to the list of valid proteinIDs if it has a
+				// valid pValue
 				validProteinIDs.add(proteinID);
-				
-				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
+
+				if ((pValue > (0 - DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER)) {
 					// special case for FDR of 0
 					FDRValue = 0;
 				}
-				
-				// iterates every value in the FDR counter lower than the current FDR value
-				for(int i = FDRList.size()-1; i >= 0; i--){
-					if( FDRValue <= FDRList.get(i) ){
+
+				// iterates every value in the FDR counter lower than the
+				// current FDR value
+				for (int i = FDRList.size() - 1; i >= 0; i--) {
+					if (FDRValue <= FDRList.get(i)) {
 						FDRCounter[i]++;
-					} else{
+					} else {
 						break;
 					}
 				}
-				
-			} 
-			
-			if(proteinIDtoFDR.get(proteinID)==null){
+
+			}
+
+			if (proteinIDtoFDR.get(proteinID) == null) {
 				System.out.println(pValue);
 			}
 			double proteinFDR = proteinIDtoFDR.get(proteinID);
-			//adds to the target protein list
-			if( (proteinFDR < FDR_threshold) && (proteinFDR > (0-DOUBLE_BUFFER)) &&
-						(foldChange.get(proteinID)>=fold_change_threshold)){
-					targetProteinIDs.add(proteinID);
+			// adds to the target protein list
+			if ((proteinFDR < FDR_threshold) && (proteinFDR > (0 - DOUBLE_BUFFER))
+					&& (foldChange.get(proteinID) >= fold_change_threshold)) {
+				targetProteinIDs.add(proteinID);
 			}
 		}
-		
+
 		// puts the working values into the correct format
 		FDRversusPredictions = new double[FDRList.size()][];
-		for(int i = 0; i < FDRList.size(); i++){
-			FDRversusPredictions[i] = new double[]{FDRList.get(i), FDRCounter[i]};
+		for (int i = 0; i < FDRList.size(); i++) {
+			FDRversusPredictions[i] = new double[] { FDRList.get(i), FDRCounter[i] };
 		}
 	}
 
@@ -377,8 +484,10 @@ public class TargetSeekerMS {
 			 */
 			if (correlationClass.isCorrDCRep()) {
 				for (int j = 0; j < Math.min(controlRepArray.length, drugRepArray.length); j++) {
-					List<Double> specCountsCond1 = Condition[0][j].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
-					List<Double> specCountsCond2 = Condition[1][j].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+					List<Double> specCountsCond1 = Condition[0][j]
+							.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+					List<Double> specCountsCond2 = Condition[1][j]
+							.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
 					double corrVal = computeCorrelation(specCountsCond1, specCountsCond2);
 					correlationClass.addCorrDCRep(proteinID, corrVal, controlRepArray[j]);
 				}
@@ -395,8 +504,10 @@ public class TargetSeekerMS {
 				Hashtable<String, Double> correlationTable = new Hashtable<String, Double>();
 				for (int i = 0; i < controlRepArray.length; i++) {
 					for (int j = (i + 1); j < controlRepArray.length; j++) {
-						List<Double> specCountsContRepX = Condition[0][i].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
-						List<Double> specCountsContRepY = Condition[0][j].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+						List<Double> specCountsContRepX = Condition[0][i]
+								.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+						List<Double> specCountsContRepY = Condition[0][j]
+								.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
 						double corrContX_Y = computeCorrelation(specCountsContRepX, specCountsContRepY);
 						String tempName = ("Corr_cont_" + controlRepArray[i] + "_" + controlRepArray[j]);
 						correlationTable.put(tempName, corrContX_Y);
@@ -414,8 +525,10 @@ public class TargetSeekerMS {
 				Hashtable<String, Double> correlationTable = new Hashtable<String, Double>();
 				for (int i = 0; i < drugRepArray.length; i++) {
 					for (int j = 0; j < controlRepArray.length; j++) {
-						List<Double> specCountsDrugRepX = Condition[1][i].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
-						List<Double> specCountsContRepY = Condition[0][j].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+						List<Double> specCountsDrugRepX = Condition[1][i]
+								.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
+						List<Double> specCountsContRepY = Condition[0][j]
+								.getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID().get(proteinID);
 						String tempName = ("Corr_DrugRep_" + drugRepArray[i] + "_ContRep_" + controlRepArray[j]);
 						double corrDX_CY = computeCorrelation(specCountsDrugRepX, specCountsContRepY); // Corr_DrugRepX_ContRepY
 						correlationTable.put(tempName, corrDX_CY);
@@ -431,65 +544,66 @@ public class TargetSeekerMS {
 	// adds frequency to the correct bin
 	private static double[] addFrequency(double[] distribution, double correlation) {
 		// ** bins 0 to 99. 100 total
-		if ((correlation>=(0.0-DOUBLE_BUFFER))&&(correlation<=(1.0+DOUBLE_BUFFER))){
+		if ((correlation >= (0.0 - DOUBLE_BUFFER)) && (correlation <= (1.0 + DOUBLE_BUFFER))) {
 			for (int i = 0; i < WINDOW_SIZE; i++) {
 				double lowerBound;
 				double upperBound;
-				
-				if(i == 0){
-					lowerBound = (0.0-DOUBLE_BUFFER);
+
+				if (i == 0) {
+					lowerBound = (0.0 - DOUBLE_BUFFER);
 				} else {
 					lowerBound = 0.00 + (STEP_SIZE * (i));
 				}
-				
-				if( i == WINDOW_SIZE-1){
-					upperBound = (1.0+DOUBLE_BUFFER);
+
+				if (i == WINDOW_SIZE - 1) {
+					upperBound = (1.0 + DOUBLE_BUFFER);
 				} else {
-					upperBound = 0.00 + (STEP_SIZE * (i+1) );	
+					upperBound = 0.00 + (STEP_SIZE * (i + 1));
 				}
-				
+
 				if ((correlation > lowerBound) && (correlation <= upperBound)) {
 					distribution[i]++;
-					//break; 
-					//check if break is okay. I guess it isn't.
+					// break;
+					// check if break is okay. I guess it isn't.
 				}
 			}
-		} 
+		}
 		return distribution;
 	}
 
 	private static void computeDrugTable() {
 		/*
-		 * Computing frequency matrix, smoothed frequency matrix,
-		 * probability matrix average distribution, average probability,
-		 * conditional distribution, conditional probability, pvalue
+		 * Computing frequency matrix, smoothed frequency matrix, probability
+		 * matrix average distribution, average probability, conditional
+		 * distribution, conditional probability, pvalue
 		 */
 		drugTable = new ResultTable(true);
-		
-		//set up correlation tables
+
+		// set up correlation tables
 		Hashtable<String, double[]> excludeTable = new Hashtable<String, double[]>();
 		Hashtable<String, double[]> includeTable = new Hashtable<String, double[]>();
 		Hashtable<String, Double> targetTable = new Hashtable<String, Double>();
-		int size = ((controlRepArray.length)*(controlRepArray.length-1)/2);
-		for(String proteinID: proteinIDSet){
+		int size = ((controlRepArray.length) * (controlRepArray.length - 1) / 2);
+		for (String proteinID : proteinIDSet) {
 			double[] exclude = new double[size];
 			double[] include = new double[size];
 			// keeps track of where to add the value
-			int count = 0; 
-			for(int i = 0; i < controlRepArray.length; i++){
-				for(int j = (i+1); j < controlRepArray.length; j++){
-					exclude[count] = correlationClass.getCorrContExclude(proteinID, controlRepArray[i], controlRepArray[j]);
+			int count = 0;
+			for (int i = 0; i < controlRepArray.length; i++) {
+				for (int j = (i + 1); j < controlRepArray.length; j++) {
+					exclude[count] = correlationClass.getCorrContExclude(proteinID, controlRepArray[i],
+							controlRepArray[j]);
 					include[count] = correlationClass.getCorrCont(proteinID, controlRepArray[i], controlRepArray[j]);
 					count++;
 				}
 			}
 			excludeTable.put(proteinID, exclude);
 			includeTable.put(proteinID, include);
-			
-			//adds target value
+
+			// adds target value
 			targetTable.put(proteinID, correlationClass.getCorrDCRepXRepY(proteinID, AVG, AVG));
 		}
-		
+
 		drugTable.setExcludeTable(excludeTable);
 		drugTable.setIncludeTable(includeTable);
 		drugTable.setTargetTable(targetTable);
@@ -498,302 +612,315 @@ public class TargetSeekerMS {
 		drugTable.setProbabilityMatrix(computeProbabilityMatrix(drugTable.getSmoothedFrequencyMatrix()));
 		drugTable.setAverageDistribution(computeAverageDistribution(drugTable.getSmoothedFrequencyMatrix()));
 		drugTable.setAverageProbability(computeProbability(drugTable.getAverageDistribution()));
-		drugTable.setProteinNoiseProbability(computeProteinNoiseProbability(
-				drugTable.getAverageProbability(), drugTable.getProbabilityMatrix()));
+		drugTable.setProteinNoiseProbability(
+				computeProteinNoiseProbability(drugTable.getAverageProbability(), drugTable.getProbabilityMatrix()));
 		drugTable.setProteinNoisePValue(computePValue(drugTable.getProteinNoiseProbability(), targetTable));
 		drugTable.setProteinIDtoDescription(proteinIDtoDescription);
-		
-		
+
 	}
 
 	private static void computeFalsePositiveTable() {
-		
+
 		falsePositiveTable = new ResultTable[controlRepArray.length];
-		
-		for(int n = 0; n < falsePositiveTable.length; n++){
+
+		for (int n = 0; n < falsePositiveTable.length; n++) {
 			// controlRepArray[n] is the control rep we are using as the "drug"
 			ResultTable falsePositive = new ResultTable(false);
-			
-			//set up correlation tables
+
+			// set up correlation tables
 			Hashtable<String, double[]> excludeTable = new Hashtable<String, double[]>();
 			Hashtable<String, double[]> includeTable = new Hashtable<String, double[]>();
 			Hashtable<String, Double> targetTable = new Hashtable<String, Double>();
-			int size = ((controlRepArray.length-1)*(controlRepArray.length-2)/2);
-			for(String proteinID: proteinIDSet){
+			int size = ((controlRepArray.length - 1) * (controlRepArray.length - 2) / 2);
+			for (String proteinID : proteinIDSet) {
 				double[] exclude = new double[size];
 				double[] include = new double[size];
 				// keeps track of where to add the value
-				int count = 0; 
-				for(int i = 0; i < controlRepArray.length; i++){
-					for(int j = (i+1); j < controlRepArray.length; j++){
-						//only if either i or j is not the same as the control rep we're excluding
-						if((controlRepArray[i] != controlRepArray[n]) && (controlRepArray[j] != controlRepArray[n]) ){
-							exclude[count] = correlationClass.getCorrContExclude(proteinID, controlRepArray[i], controlRepArray[j]);
-							include[count] = correlationClass.getCorrCont(proteinID, controlRepArray[i], controlRepArray[j]);
+				int count = 0;
+				for (int i = 0; i < controlRepArray.length; i++) {
+					for (int j = (i + 1); j < controlRepArray.length; j++) {
+						// only if either i or j is not the same as the control
+						// rep we're excluding
+						if ((controlRepArray[i] != controlRepArray[n]) && (controlRepArray[j] != controlRepArray[n])) {
+							exclude[count] = correlationClass.getCorrContExclude(proteinID, controlRepArray[i],
+									controlRepArray[j]);
+							include[count] = correlationClass.getCorrCont(proteinID, controlRepArray[i],
+									controlRepArray[j]);
 							count++;
 						}
 					}
 				}
 				excludeTable.put(proteinID, exclude);
 				includeTable.put(proteinID, include);
-				
-				//adds target value
+
+				// adds target value
 				double sum = 0.0;
 				int numElements = 0;
-				for(int i = 0; i < controlRepArray.length; i++){
-					//access corr_cont_x_y values for everything related to "n"
-					if( i > n ){
+				for (int i = 0; i < controlRepArray.length; i++) {
+					// access corr_cont_x_y values for everything related to "n"
+					if (i > n) {
 						double value = correlationClass.getCorrCont(proteinID, controlRepArray[n], controlRepArray[i]);
-						if( (value > -(1+DOUBLE_BUFFER)) && (value < (1+DOUBLE_BUFFER))){
+						if ((value > -(1 + DOUBLE_BUFFER)) && (value < (1 + DOUBLE_BUFFER))) {
 							sum += value;
 							numElements++;
 						}
 					}
-					if( i < n ){
+					if (i < n) {
 						double value = correlationClass.getCorrCont(proteinID, controlRepArray[i], controlRepArray[n]);
-						if( (value > -(1+DOUBLE_BUFFER)) && (value < (1+DOUBLE_BUFFER))){
+						if ((value > -(1 + DOUBLE_BUFFER)) && (value < (1 + DOUBLE_BUFFER))) {
 							sum += value;
 							numElements++;
 						}
-					} 
+					}
 				}
-				targetTable.put(proteinID, (sum/numElements));
-				
+				targetTable.put(proteinID, (sum / numElements));
+
 			}
-	
+
 			falsePositive.setExcludeTable(excludeTable);
 			falsePositive.setIncludeTable(includeTable);
 			falsePositive.setTargetTable(targetTable);
 			falsePositive.setFrequencyMatrix(computeFrequencyMatrix(excludeTable, includeTable));
 			falsePositive.setSmoothedFrequencyMatrix(smoothDistribution(falsePositive.getFrequencyMatrix(), k_value));
 			falsePositive.setProbabilityMatrix(computeProbabilityMatrix(falsePositive.getSmoothedFrequencyMatrix()));
-			falsePositive.setAverageDistribution(computeAverageDistribution(falsePositive.getSmoothedFrequencyMatrix()));
+			falsePositive
+					.setAverageDistribution(computeAverageDistribution(falsePositive.getSmoothedFrequencyMatrix()));
 			falsePositive.setAverageProbability(computeProbability(falsePositive.getAverageDistribution()));
 			falsePositive.setProteinNoiseProbability(computeProteinNoiseProbability(
 					falsePositive.getAverageProbability(), falsePositive.getProbabilityMatrix()));
 			falsePositive.setProteinNoisePValue(computePValue(falsePositive.getProteinNoiseProbability(), targetTable));
 			falsePositiveTable[n] = falsePositive;
 		}
-		
-		//sets up the false positive counter 
-		int fptSize = ((FPT_WINDOW_SIZE)+(int)(FPT_STEP_SIZE/FPT_SMALLER_STEP_SIZE));
+
+		// sets up the false positive counter
+		int fptSize = ((FPT_WINDOW_SIZE) + (int) (FPT_STEP_SIZE / FPT_SMALLER_STEP_SIZE));
 		falsePositiveCounter = new double[fptSize][];
-		for(int i = 0; i < falsePositiveCounter.length; i++){
-			if(i < FPT_WINDOW_SIZE){
+		for (int i = 0; i < falsePositiveCounter.length; i++) {
+			if (i < FPT_WINDOW_SIZE) {
 				falsePositiveCounter[i] = new double[4];// magic number
-				falsePositiveCounter[i][0] = (1-(i*FPT_STEP_SIZE));
-			}else{
+				falsePositiveCounter[i][0] = (1 - (i * FPT_STEP_SIZE));
+			} else {
 				falsePositiveCounter[i] = new double[4];// magic number
-				falsePositiveCounter[i][0] = (FPT_STEP_SIZE - ((i+1)-FPT_WINDOW_SIZE)*FPT_SMALLER_STEP_SIZE);
+				falsePositiveCounter[i][0] = (FPT_STEP_SIZE - ((i + 1) - FPT_WINDOW_SIZE) * FPT_SMALLER_STEP_SIZE);
 			}
 		}
 
-		//Counts the false positives
-		for(int n = 0; n< falsePositiveTable.length; n++){
+		// Counts the false positives
+		for (int n = 0; n < falsePositiveTable.length; n++) {
 			Hashtable<String, Double> pValueSet = falsePositiveTable[n].getProteinNoisePValue();
-			
-			//for method 2
+
+			// for method 2
 			double[][] individualFalsePositiveCounter = new double[falsePositiveCounter.length][];
-			//copies the pValue size of the original array and zeroes out the counter part
-			for(int i = 0; i < falsePositiveCounter.length; i++){
+			// copies the pValue size of the original array and zeroes out the
+			// counter part
+			for (int i = 0; i < falsePositiveCounter.length; i++) {
 				individualFalsePositiveCounter[i] = Arrays.copyOf(falsePositiveCounter[i], 2);
 				individualFalsePositiveCounter[i][1] = 0;
 			}
-			
-			for(String proteinID: proteinIDSet){
+
+			for (String proteinID : proteinIDSet) {
 				Double pValue = pValueSet.get(proteinID);
-				
-				//excludes invalid pValues
-				if((pValue >= (0-DOUBLE_BUFFER)) && (pValue <= (1+DOUBLE_BUFFER) )){
-					//adds the pValue to all applicable bins
-					for(int i = 0; i < falsePositiveCounter.length-1; i++){
-						if(pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER){
+
+				// excludes invalid pValues
+				if ((pValue >= (0 - DOUBLE_BUFFER)) && (pValue <= (1 + DOUBLE_BUFFER))) {
+					// adds the pValue to all applicable bins
+					for (int i = 0; i < falsePositiveCounter.length - 1; i++) {
+						if (pValue < falsePositiveCounter[i][0] + DOUBLE_BUFFER) {
 							falsePositiveCounter[i][1]++;
 							individualFalsePositiveCounter[i][1]++;
-						}else{
+						} else {
 							break;
 						}
 					}
 				}
 			}
-			
-			//for method 2
+
+			// for method 2
 			falsePositiveTable[n].setFalsePositiveCounter(individualFalsePositiveCounter);
 		}
-		
-		//for methods 1 and 2, the denominator
+
+		// for methods 1 and 2, the denominator
 		double[][] truePositiveCounter = new double[falsePositiveCounter.length][];
-		//copies the pValue size of the original array and zeroes out the counter part
-		for(int i = 0; i < truePositiveCounter.length; i++){
+		// copies the pValue size of the original array and zeroes out the
+		// counter part
+		for (int i = 0; i < truePositiveCounter.length; i++) {
 			truePositiveCounter[i] = Arrays.copyOf(falsePositiveCounter[i], 2);
 			truePositiveCounter[i][1] = 0;
 		}
-		for(String proteinID: proteinIDSet){
+		for (String proteinID : proteinIDSet) {
 			Double pValue = drugTable.getProteinNoisePValue().get(proteinID);
-			//excludes invalid pValues
-			if((pValue >= (0-DOUBLE_BUFFER) ) && (pValue <= (1+DOUBLE_BUFFER))){
-				//adds the pValue to all applicable bins
-				for(int i = 0; i < truePositiveCounter.length; i++){
-					if(pValue <= truePositiveCounter[i][0]+DOUBLE_BUFFER){
+			// excludes invalid pValues
+			if ((pValue >= (0 - DOUBLE_BUFFER)) && (pValue <= (1 + DOUBLE_BUFFER))) {
+				// adds the pValue to all applicable bins
+				for (int i = 0; i < truePositiveCounter.length; i++) {
+					if (pValue <= truePositiveCounter[i][0] + DOUBLE_BUFFER) {
 						truePositiveCounter[i][1]++;
-					}else{
+					} else {
 						break;
 					}
 				}
 			}
 		}
 
-		//for debugging
-		int[] debugQueue = new int[]{0, 1, 50, 500, 5000};
-		if(k_value_DEBUG){
-			System.out.println("k = "+k_value);
+		// for debugging
+		int[] debugQueue = new int[] { 0, 1, 50, 500, 5000 };
+		if (k_value_DEBUG) {
+			System.out.println("k = " + k_value);
 		}
-		
-		//method 1
+
+		// method 1
 		int totalValidPValues = 0;
-		double method1MinValue = Double.MAX_VALUE; // for making the function monotonic
-		for(int n = 0; n < falsePositiveTable.length; n++){
+		double method1MinValue = Double.MAX_VALUE; // for making the function
+													// monotonic
+		for (int n = 0; n < falsePositiveTable.length; n++) {
 			totalValidPValues += falsePositiveTable[n].getNumValidPValues();
 		}
-		
-		if(k_value_DEBUG){
-			System.out.println("totalValidPValues = "+totalValidPValues);
+
+		if (k_value_DEBUG) {
+			System.out.println("totalValidPValues = " + totalValidPValues);
 		}
-		
-		for(int i = 0; i < falsePositiveCounter.length; i++){
-			double numerator = (falsePositiveCounter[i][1]/totalValidPValues);
-			double denominator = (truePositiveCounter[i][1]/drugTable.getNumValidPValues());
+
+		for (int i = 0; i < falsePositiveCounter.length; i++) {
+			double numerator = (falsePositiveCounter[i][1] / totalValidPValues);
+			double denominator = (truePositiveCounter[i][1] / drugTable.getNumValidPValues());
 			double result;
 
-			if(k_value_DEBUG){				
-				if( i == 0 ){
-					for(ResultTable a: falsePositiveTable){
-						System.out.println("FPC[0][1] = "+a.getFalsePositiveCounter()[0][1]+"\tnumValidPValues = "+a.getNumValidPValues());
+			if (k_value_DEBUG) {
+				if (i == 0) {
+					for (ResultTable a : falsePositiveTable) {
+						System.out.println("FPC[0][1] = " + a.getFalsePositiveCounter()[0][1] + "\tnumValidPValues = "
+								+ a.getNumValidPValues());
 					}
 				}
-				for(int d: debugQueue){
-					if( i == d )
-						System.out.println("For i = "+i+" method 1, numerator: "+numerator+" ; denominator : "+denominator);
+				for (int d : debugQueue) {
+					if (i == d)
+						System.out.println("For i = " + i + " method 1, numerator: " + numerator + " ; denominator : "
+								+ denominator);
 				}
 			}
-			
-			//to prevent result is NaN or infinity
-			if( (numerator < (0+DOUBLE_BUFFER)) || (denominator < (0)+DOUBLE_BUFFER)){
+
+			// to prevent result is NaN or infinity
+			if ((numerator < (0 + DOUBLE_BUFFER)) || (denominator < (0) + DOUBLE_BUFFER)) {
 				result = 0;
-			}else{
-				result = numerator/denominator;
+			} else {
+				result = numerator / denominator;
 			}
-			
-			//monotonic transformation
-			if( result < method1MinValue ){
+
+			// monotonic transformation
+			if (result < method1MinValue) {
 				method1MinValue = result;
 			}
 			falsePositiveCounter[i][2] = method1MinValue;
 		}
-		
-		//method 2 
-		//averages the ratios of false positives to total valid p values
+
+		// method 2
+		// averages the ratios of false positives to total valid p values
 		int[] validPValues = new int[falsePositiveTable.length];
-		double method2MinValue = Double.MAX_VALUE; // for making the function monotonic
-		for(int n = 0; n < falsePositiveTable.length; n++){
+		double method2MinValue = Double.MAX_VALUE; // for making the function
+													// monotonic
+		for (int n = 0; n < falsePositiveTable.length; n++) {
 			validPValues[n] = falsePositiveTable[n].getNumValidPValues();
 		}
 
-
-		if(k_value_DEBUG){
+		if (k_value_DEBUG) {
 			System.out.println("validPValues: ");
-			for(int d: validPValues){
-				System.out.print(d+"\t");
+			for (int d : validPValues) {
+				System.out.print(d + "\t");
 			}
 			System.out.println();
 		}
-		
-		for(int i = 0; i< falsePositiveCounter.length; i++){
+
+		for (int i = 0; i < falsePositiveCounter.length; i++) {
 			double sum = 0;
 			int numElements = 0;
-			for(int n = 0; n < falsePositiveTable.length; n++){
-				double ratio = (falsePositiveTable[n].getFalsePositiveCounter()[i][1])/(validPValues[n]);
+			for (int n = 0; n < falsePositiveTable.length; n++) {
+				double ratio = (falsePositiveTable[n].getFalsePositiveCounter()[i][1]) / (validPValues[n]);
 				sum += ratio;
 				numElements++;
 			}
-			
-			double numerator = (sum/numElements);
-			double denominator = (truePositiveCounter[i][1]/drugTable.getNumValidPValues());
+
+			double numerator = (sum / numElements);
+			double denominator = (truePositiveCounter[i][1] / drugTable.getNumValidPValues());
 			double result;
 
-			if(k_value_DEBUG){
-				for(int d: debugQueue){
-					if( i == d )
-						System.out.println("For i = "+i+" method 2, numerator: "+numerator+" ; denominator : "+denominator);
+			if (k_value_DEBUG) {
+				for (int d : debugQueue) {
+					if (i == d)
+						System.out.println("For i = " + i + " method 2, numerator: " + numerator + " ; denominator : "
+								+ denominator);
 
 				}
 			}
-			
-			//to prevent result is NaN or infinity
-			if( (numerator < (0+DOUBLE_BUFFER)) || (denominator < (0)+DOUBLE_BUFFER)){
+
+			// to prevent result is NaN or infinity
+			if ((numerator < (0 + DOUBLE_BUFFER)) || (denominator < (0) + DOUBLE_BUFFER)) {
 				result = 0;
-			}else{
-				result = numerator/denominator;
+			} else {
+				result = numerator / denominator;
 			}
-			
+
 			// for monotonicity
-			if( result < method2MinValue ){
+			if (result < method2MinValue) {
 				method2MinValue = result;
 			}
 			falsePositiveCounter[i][3] = method2MinValue;
 		}
-		
-		
+
 	}
 
 	// computes the frequency matrix
 	private static double[][] computeFrequencyMatrix(Hashtable<String, double[]> excludeTable,
-				Hashtable<String, double[]> includeTable) {
+			Hashtable<String, double[]> includeTable) {
 		double[][] frequencyMatrix = new double[WINDOW_SIZE][WINDOW_SIZE];
-		
-		for (String proteinID : proteinIDSet) { 
-			//exclude table holds all the values of Corr_cont_avg_EXCLUDE_x_y
-			//include table holds all the values of Corr_cont_x_y
-			//the x and y values for these must line up
+
+		for (String proteinID : proteinIDSet) {
+			// exclude table holds all the values of Corr_cont_avg_EXCLUDE_x_y
+			// include table holds all the values of Corr_cont_x_y
+			// the x and y values for these must line up
 			double[] exclude = excludeTable.get(proteinID);
 			double[] include = includeTable.get(proteinID);
-			//exclude stands for the average correlation (excluding the value of include)
-			//include is the correlation value we are adding for a given average (exclude)
+			// exclude stands for the average correlation (excluding the value
+			// of include)
+			// include is the correlation value we are adding for a given
+			// average (exclude)
 
 			for (int i = 0; i < exclude.length; i++) {
 				// finds the bin for exclude
-				if ((exclude[i]>=(0.0-DOUBLE_BUFFER))&&(exclude[i]<=(1.0+DOUBLE_BUFFER))){
+				if ((exclude[i] >= (0.0 - DOUBLE_BUFFER)) && (exclude[i] <= (1.0 + DOUBLE_BUFFER))) {
 					for (int k = 0; k < WINDOW_SIZE; k++) {
 						double lowerBound;
 						double upperBound;
-						
-						if(k == 0){
-							lowerBound = (0.0-DOUBLE_BUFFER);
+
+						if (k == 0) {
+							lowerBound = (0.0 - DOUBLE_BUFFER);
 						} else {
 							lowerBound = 0.00 + (STEP_SIZE * (k));
 						}
-						
-						if( k == WINDOW_SIZE-1){
-							upperBound = (1.0+DOUBLE_BUFFER);
+
+						if (k == WINDOW_SIZE - 1) {
+							upperBound = (1.0 + DOUBLE_BUFFER);
 						} else {
-							upperBound = 0.00 + (STEP_SIZE * (k+1));	
+							upperBound = 0.00 + (STEP_SIZE * (k + 1));
 						}
-						
-						//System.out.println("lowerBound = "+lowerBound+" \tupperBound = "+upperBound);
-						
+
+						// System.out.println("lowerBound = "+lowerBound+"
+						// \tupperBound = "+upperBound);
+
 						if ((exclude[i] > lowerBound) && (exclude[i] <= upperBound)) {
 							frequencyMatrix[k] = addFrequency(frequencyMatrix[k], include[i]); // adds
-																							// include
-						}			
-						
+																								// include
+						}
+
 					}
-				} 
+				}
 			}
 		}
-		//it's y and x because thought it appears as x and y on the frequency matrix,
-		//the indices are actually swapped on the data structure
-		//System.out.println("frequencyMatrix["+y+"]["+x+"] = "+frequencyMatrix[y][x]);
-		
+		// it's y and x because thought it appears as x and y on the frequency
+		// matrix,
+		// the indices are actually swapped on the data structure
+		// System.out.println("frequencyMatrix["+y+"]["+x+"] =
+		// "+frequencyMatrix[y][x]);
+
 		return frequencyMatrix;
 	}
 
@@ -961,7 +1088,7 @@ public class TargetSeekerMS {
 			for (int i = 0; i < controlRepArray.length; i++) {
 				for (int j = (i + 1); j < controlRepArray.length; j++) {
 					binList.add(
-						getBinNum(correlationClass.getCorrCont(proteinID, controlRepArray[i], controlRepArray[j])));
+							getBinNum(correlationClass.getCorrCont(proteinID, controlRepArray[i], controlRepArray[j])));
 				}
 			}
 
@@ -969,7 +1096,7 @@ public class TargetSeekerMS {
 			boolean isNA = false;
 
 			for (int i : binList) { // if any value is -2, it is not valid
-				if (i < 0 )
+				if (i < 0)
 					isNA = true;
 			}
 
@@ -980,7 +1107,7 @@ public class TargetSeekerMS {
 					for (int j : binList) {
 						probability *= probabilityMatrix[i][j];
 					}
-				    
+
 					conditionalProbability[i] = probability;
 				} else {
 					conditionalProbability[i] = -2.00;
@@ -1006,7 +1133,7 @@ public class TargetSeekerMS {
 
 	// sums up all the values up to a target value for the noise value
 	private static Hashtable<String, Double> computePValue(Hashtable<String, double[]> proteinNoiseValue,
-				Hashtable<String, Double> targetTable) {
+			Hashtable<String, Double> targetTable) {
 		Hashtable<String, Double> output = new Hashtable<String, Double>();
 
 		for (String proteinID : proteinIDSet) {
@@ -1016,17 +1143,16 @@ public class TargetSeekerMS {
 			double targetValue = targetTable.get(proteinID);
 			double pValue = 0;
 
-			if ((range[0] < (0.00-DOUBLE_BUFFER)) || (targetValue < -(0.00+DOUBLE_BUFFER))) {
+			if ((range[0] < (0.00 - DOUBLE_BUFFER)) || (targetValue < -(0.00 + DOUBLE_BUFFER))) {
 				pValue = -2.0;
-			}else{
+			} else {
 				for (int i = 0; i <= getBinNum(targetValue); i++) {
 					pValue += range[i];
-				}	
+				}
 			}
-			
 
 			output.put(proteinID, pValue);
-			
+
 		}
 
 		return output;
@@ -1036,79 +1162,182 @@ public class TargetSeekerMS {
 
 		if (correlation != -2.0) { // if not -2.0 then write computed
 									// correlation
-			if(correlation == 1.0){
-			  return 99;
+			if (correlation == 1.0) {
+				return 99;
 			}
-			
-			int bin = (int) (Math.ceil((correlation) * 100)-1);
-			if(bin == -1){
+
+			int bin = (int) (Math.ceil((correlation) * 100) - 1);
+			if (bin == -1) {
 				return 0;
-			}
-			else{
+			} else {
 				return bin;
 			}
-			
+
 		} else { // if -2.0 then write N/A
 			return -2;
 		}
 
 	}
 
-	private static double computeCorrelation(List<Double> specCountsCond1, List<Double> specCountsCond2) { 
-		//unique to this class. Actually computes 1-Euclidean distance
+	private static double computeCorrelation(List<Double> specCountsCond1, List<Double> specCountsCond2) {
+		// unique to this class. Actually computes 1-Euclidean distance
 		double euclidianDistance = 0;
 		double sum = 0;
 		boolean hasNA = false;
-		
-		for(int i = 0; i < specCountsCond1.size(); i++){
-			if((specCountsCond1.get(i) > -(0+DOUBLE_BUFFER)) && (specCountsCond2.get(i) > -(0+DOUBLE_BUFFER))){
-				double diff = (specCountsCond1.get(i)-specCountsCond2.get(i));
-				sum += (diff*diff);
-			} else{
+
+		for (int i = 0; i < specCountsCond1.size(); i++) {
+			if ((specCountsCond1.get(i) > -(0 + DOUBLE_BUFFER)) && (specCountsCond2.get(i) > -(0 + DOUBLE_BUFFER))) {
+				double diff = (specCountsCond1.get(i) - specCountsCond2.get(i));
+				sum += (diff * diff);
+			} else {
 				hasNA = true;
 			}
 		}
 		euclidianDistance = Math.sqrt(sum);
-		
-		//normalizes by max distance
-		//makes the distance metric between 0 and 1
-		euclidianDistance = euclidianDistance/(Math.sqrt(2));
-		
-		if(hasNA){
+
+		// normalizes by max distance
+		// makes the distance metric between 0 and 1
+		euclidianDistance = euclidianDistance / (Math.sqrt(2));
+
+		if (hasNA) {
 			return -2.0;
-		} else{
-			//transforms the distance to a similarity measure
-			return (1.0-euclidianDistance);
+		} else {
+			// transforms the distance to a similarity measure
+			return (1.0 - euclidianDistance);
 		}
 	}
 
 	// Sorts by FDR
-	private static void sortByFDR(){
+	private static void sortByFDR() {
 		scores = new ArrayList<Score>();
-		Hashtable<String,Double> pValueTable = drugTable.getProteinNoisePValue();
-			
-		for(String proteinID: proteinIDSet){	
-			//PValue and FDR
+		Hashtable<String, Double> pValueTable = drugTable.getProteinNoisePValue();
+
+		for (String proteinID : proteinIDSet) {
+			// PValue and FDR
 			double pValue = pValueTable.get(proteinID);
-			//FDR is 2, so it is sorted accordingly
+			// FDR is 2, so it is sorted accordingly
 			double FDRvalue = 2;
-			
-			if( (pValue > (0-DOUBLE_BUFFER)) && (pValue <= (1.0+DOUBLE_BUFFER))){
-				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER) ){
-					FDRvalue = falsePositiveCounter[falsePositiveCounter.length-1][2];
-				} else{
-					for(int i = 0; i < falsePositiveCounter.length-1; i++){
-						if( (pValue < falsePositiveCounter[i][0]+DOUBLE_BUFFER) && (pValue > falsePositiveCounter[i+1][0]+DOUBLE_BUFFER) ){
+
+			if ((pValue > (0 - DOUBLE_BUFFER)) && (pValue <= (1.0 + DOUBLE_BUFFER))) {
+				if ((pValue > (0 - DOUBLE_BUFFER)) && (pValue < DOUBLE_BUFFER)) {
+					FDRvalue = falsePositiveCounter[falsePositiveCounter.length - 1][2];
+				} else {
+					for (int i = 0; i < falsePositiveCounter.length - 1; i++) {
+						if ((pValue < falsePositiveCounter[i][0] + DOUBLE_BUFFER)
+								&& (pValue > falsePositiveCounter[i + 1][0] + DOUBLE_BUFFER)) {
 							FDRvalue = falsePositiveCounter[i][2];
 						}
-					}	
+					}
 				}
-						
+
 			}
-			scores.add(new Score(FDRvalue,proteinID));
+			scores.add(new Score(FDRvalue, proteinID));
 		}
 		Collections.sort(scores);
-	
+
+	}
+
+	/*
+	 * Writes the output file. You can toggle whether to print: - spec values -
+	 * frequency matrix - smoothed frequency matrix - probability matrix -
+	 * average distribution - average probability - rejected proteins
+	 */
+	private static void writeError(String outputFile) {
+		System.out.println("in write error");
+		try {
+			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
+			out.write("An error has occured while analyzing your input file.\n");
+
+			if ((errorHandler.containsKey("Delimit")) && !errorHandler.get("Delimit")) {
+				out.write(
+						"\nFile delimit format unsupported.\nPlease make sure input file is a tab-delimited .txt file.\n");
+			} else {
+				if (err_handling_line > 0) {
+					out.write("\nLine " + (err_handling_line + 1) + " of the input file is not properly formatted.");
+				}
+
+				List<String> listOfMissingFractions = new ArrayList<String>();
+				for (String name : errorHandler.keySet()) {
+					if ((!errorHandler.get(name)) && !(name.contains("F"))) {
+						listOfMissingFractions.add(new String(name));
+					}
+				}
+				Collections.sort(listOfMissingFractions);
+				out.write("\n");
+				for (String name : listOfMissingFractions) {
+					for (int i = 0; i < number_fractions; i++) {
+						out.write("There is an error with fraction " + name + "F" + (i + 1) + "\n");
+					}
+				}
+			}
+
+			out.write("\nPlease refer to the example input file for proper formatting: "
+					+ "http://sealion.scripps.edu:28080/Target_Seeker/files/Worm_sample_input.txt\n\n");
+			out.write("If you have any questions or issues please email us at mlaval@scripps.edu");
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/*
+	 * Writes the output file. You can toggle whether to print: - spec values -
+	 * frequency matrix - smoothed frequency matrix - probability matrix -
+	 * average distribution - average probability - rejected proteins
+	 */
+	private static void writeErrorNumFormatting(String outputFile, int[] Cond_Rep_Frac) {
+		System.out.println("in write error num formatting");
+		try {
+			int i = Cond_Rep_Frac[0];
+			int j = Cond_Rep_Frac[1];
+			int k = Cond_Rep_Frac[2];
+
+			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
+			out.write("An error has occured while analyzing your input file.\n");
+
+			if (err_handling_line > 0) {
+				out.write("\nLine " + (err_handling_line + 1) + " of the input file is not properly formatted.\n");
+			}
+
+			out.write("There is an error with fraction " + Condition[i][j].toString() + "F" + (k + 1) + "\n");
+
+			out.write("\nPlease refer to the example input file for proper formatting: "
+					+ "http://sealion.scripps.edu:28080/Target_Seeker/files/Worm_sample_input.txt\n\n");
+			out.write("If you have any questions or issues please email us at mlaval@scripps.edu");
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/*
+	 * Writes the output file. You can toggle whether to print: - spec values -
+	 * frequency matrix - smoothed frequency matrix - probability matrix -
+	 * average distribution - average probability - rejected proteins
+	 */
+	private static void writeErrorOutOfBounds(String outputFile, int[] Cond_Rep_Frac) {
+		System.out.println("in write error num formatting");
+		try {
+			int i = Cond_Rep_Frac[0];
+			int j = Cond_Rep_Frac[1];
+			int k = Cond_Rep_Frac[2];
+
+			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
+			out.write("An error has occured while analyzing your input file.\n");
+
+			if (err_handling_line > 0) {
+				out.write("\nLine " + (err_handling_line + 1) + " of the input file is not properly formatted.\n");
+			}
+
+			out.write("There is an error with fraction " + Condition[i][j].toString() + "F" + (k + 1) + "\n");
+
+			out.write("\nPlease refer to the example input file for proper formatting: "
+					+ "http://sealion.scripps.edu:28080/Target_Seeker/files/Worm_sample_input.txt\n\n");
+			out.write("If you have any questions or issues please email us at mlaval@scripps.edu");
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/*
@@ -1120,52 +1349,71 @@ public class TargetSeekerMS {
 		System.out.println("in write");
 		try {
 			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
-	
-			out.write("Protein\tSimilarity_Drug_vs_Control\tpValue\tFDR\t");
-			out.write("Fold-change\tSignificant\n");
+
+			out.write(inputParameters);
+
+			out.write("Protein\tSimilarity_Drug_vs_Control\tpValue\tFDR\tFold-change\tSignificant\t");
+			out.write("\n");
 			out.flush();
-				
-			Hashtable<String,Double> targetTable = drugTable.getTargetTable();
-			Hashtable<String,Double> pValueTable = drugTable.getProteinNoisePValue();
-			
-			for(Score score: scores){
+
+			Hashtable<String, Double> targetTable = drugTable.getTargetTable();
+			Hashtable<String, Double> pValueTable = drugTable.getProteinNoisePValue();
+
+			for (Score score : scores) {
 				String proteinID = score.proteinID;
-				out.write(proteinID+"\t");
-					
-				//corrDCAVG
+				out.write(proteinID + "\t");
+
+				// corrDCAVG
 				double corrDCAVG = targetTable.get(proteinID);
-				if( (corrDCAVG >= -(1+DOUBLE_BUFFER)) && (corrDCAVG <= (1.0+DOUBLE_BUFFER)) ){
-					out.write(corrDCAVG+"\t");
-				}else{
+				if ((corrDCAVG >= -(1 + DOUBLE_BUFFER)) && (corrDCAVG <= (1.0 + DOUBLE_BUFFER))) {
+					out.write(corrDCAVG + "\t");
+				} else {
 					out.write("N/A\t");
 				}
-					
-				//PValue and FDR
+
+				// PValue and FDR
 				double pValue = pValueTable.get(proteinID);
 				double FDRvalue = score.FDR;
-				
-				if( (pValue > (0-DOUBLE_BUFFER)) && (pValue <= (1.0+DOUBLE_BUFFER))){
-					if( (FDRvalue > (0-DOUBLE_BUFFER)) && (FDRvalue <= (1.0+DOUBLE_BUFFER))){
-						out.write(pValue+"\t"+FDRvalue+"\t");		
+
+				if ((pValue > (0 - DOUBLE_BUFFER)) && (pValue <= (1.0 + DOUBLE_BUFFER))) {
+					if ((FDRvalue > (0 - DOUBLE_BUFFER)) && (FDRvalue <= (1.0 + DOUBLE_BUFFER))) {
+						out.write(pValue + "\t" + FDRvalue + "\t");
 					} else {
-						out.write(pValue+"\t"+"N/A\t");
+						out.write(pValue + "\t" + "N/A\t");
 					}
-				} else{
-					for(int j = 0; j < 2; j++){
+				} else {
+					for (int j = 0; j < 2; j++) {
 						out.write("N/A\t");
 					}
 				}
-					
-				//prints fold change value
-				if( ( foldChange.get(proteinID) >= (0-DOUBLE_BUFFER)) ){
-					out.write(foldChange.get(proteinID)+"\t");
-				} else{
+
+				// prints fold change value
+				if ((foldChange.get(proteinID) >= (0 - DOUBLE_BUFFER))) {
+					out.write(foldChange.get(proteinID) + "\t");
+				} else {
 					out.write("N/A\t");
 				}
 
 				// prints if it is significant or not
-				Boolean isSignificant = (foldChange.get(proteinID) >= fold_change_threshold) && (FDRvalue > -(0+DOUBLE_BUFFER)) && (FDRvalue <= FDR_threshold);
-				out.write(isSignificant+"\n");
+				Boolean isSignificant = (foldChange.get(proteinID) >= fold_change_threshold)
+						&& (FDRvalue > -(0 + DOUBLE_BUFFER)) && (FDRvalue <= FDR_threshold);
+				out.write(isSignificant + "\t");
+				// TODO
+				// out.write(correlationClass.print(proteinID));
+				// for (int i = 0; i < Condition.length; i++) {
+				// for (int j = 0; j < Condition[i].length; j++) {
+				// // out.write(Condition[i][j].getSpecForOutput(proteinID));
+				// String output = "";
+				// List<Double> specs =
+				// Condition[i][j].getProteinIDtoSpecCountVectorsNormalizedAcrossProteinID()
+				// .get(proteinID);
+				// for (Double d : specs) {
+				// output += d + "\t";
+				// }
+				// out.write(output);
+				// }
+				// }
+				out.write("\n");
 				out.flush();
 			}
 			out.write("\n");
@@ -1174,7 +1422,7 @@ public class TargetSeekerMS {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	
+
 	}
 
 }
