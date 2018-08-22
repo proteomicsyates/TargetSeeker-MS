@@ -1,4 +1,3 @@
-import java.util.*;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -9,24 +8,23 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
-import java.io.*;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-import org.apache.commons.io.output.*;
-
-import javax.servlet.http.*;
-import javax.servlet.*;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @javax.servlet.annotation.MultipartConfig
 public class TargetSeekerServlet extends HttpServlet {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	private String filePath;
 
+	@Override
 	public void init() {
 		// Get the file location where it would be stored.
 		// filePath =
@@ -34,6 +32,7 @@ public class TargetSeekerServlet extends HttpServlet {
 
 	}
 
+	@Override
 	public void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, java.io.IOException {
 
@@ -248,6 +247,7 @@ public class TargetSeekerServlet extends HttpServlet {
 
 	}
 
+	@Override
 	public void doGet(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, java.io.IOException {
 
