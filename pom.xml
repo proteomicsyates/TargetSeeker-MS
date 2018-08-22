@@ -58,15 +58,6 @@
 				</executions>
 			</plugin>
 		</plugins>
-		<sourceDirectory>workspace/TargetSeeker-MS/src</sourceDirectory>
-		<resources>
-			<resource>
-				<directory>workspace/TargetSeeker-MS/src</directory>
-				<excludes>
-					<exclude>**/*.java</exclude>
-				</excludes>
-			</resource>
-		</resources>
 	</build>
 	<dependencies>
 		<!-- https://mvnrepository.com/artifact/commons-io/commons-io -->

@@ -339,7 +339,7 @@ public class TargetSeekerMS {
 			sortByFDR();
 
 			write(output_file);
-			System.out.println("done");
+			System.out.println("TargetSeeker-MS finished.");
 		} catch (Exception e) {
 			writeError(output_file);
 			e.printStackTrace();
@@ -1243,7 +1243,7 @@ public class TargetSeekerMS {
 	 * average distribution - average probability - rejected proteins
 	 */
 	private static void writeError(String outputFile) {
-		System.out.println("in write error");
+		System.out.println("Error int writing file");
 		try {
 			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
 			out.write("An error has occured while analyzing your input file.\n");
@@ -1286,7 +1286,7 @@ public class TargetSeekerMS {
 	 * average distribution - average probability - rejected proteins
 	 */
 	private static void writeErrorNumFormatting(String outputFile, int[] Cond_Rep_Frac) {
-		System.out.println("in write error num formatting");
+		System.out.println("Error due to number formatting.");
 		try {
 			int i = Cond_Rep_Frac[0];
 			int j = Cond_Rep_Frac[1];
@@ -1346,7 +1346,7 @@ public class TargetSeekerMS {
 	 * average distribution - average probability - rejected proteins
 	 */
 	private static void write(String outputFile) {
-		System.out.println("in write");
+		System.out.println("Program executed successfully. Writing file to "+outputFile);
 		try {
 			BufferedWriter out = new BufferedWriter(new FileWriter(new File(outputFile)));
 

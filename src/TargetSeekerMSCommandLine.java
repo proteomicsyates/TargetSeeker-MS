@@ -63,11 +63,11 @@ public class TargetSeekerMSCommandLine {
 			inputFileName = cmd.getOptionValue("i");
 			outputFileName = cmd.getOptionValue("o");
 			// checking if file paths are valid
-			if (!checkValidFilePath(inputFileName)) {
+			if ((inputFileName == null) || !checkValidFilePath(inputFileName)) {
 				throw (new ParseException("Invalid input file!"));
-			} else if ((outputFileName != null) && !checkValidFilePath(outputFileName)) {
-				throw (new ParseException("Invalid output file!"));
-			} 
+			} else if(outputFileName == null) {
+				outputFileName = DEFAULT_OUTPUT_FILE_NAME;
+			}
 
 			/*** Program parameters ***/
 			// numControlReplicates
@@ -153,6 +153,7 @@ public class TargetSeekerMSCommandLine {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println(e.getMessage());
+			System.exit(0);
 		}
 		System.out.println("inputFileName: " + inputFileName);
 		System.out.println("outputFileName: " + outputFileName);
