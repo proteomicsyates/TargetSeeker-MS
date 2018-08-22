@@ -1,110 +1,49 @@
+import java.io.File;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 
 public class TargetSeekerMSCommandLine {
 	private static Options options;
 
 	/*** Default parameters ***/
-	public static final double DEFAULT_PPM_TOLERANCE = 0.000002;
-	public static final double DEFAULT_X_CORR_SCORE = 2.0;
-	public static final int DEFAULT_MISSED_CLEAVAGES = 0;
-	public static final ExclusionProfileEnum DEFAULT_EXCLUSION_PROFILE = ExclusionProfileEnum.MACHINE_LEARNING_GUIDED_EXCLUSION_PROFILE;
-
-	/*** File paths ***/
-	private static String fasta_file_name;
-	private static String digested_fasta_file_name;
-	private static String mzml_file_name;
-	private static String mzid_file_name;
-	private static String result_database_file_name;
+	public static final int DEFAULT_CONTROL_REPLICATES = 4;
+	public static final int DEFAULT_DRUG_REPLICATES = 3;
+	public static final int DEFAULT_NUM_FRACTIONS = 10;
+	public static final int DEFAULT_KVALUE = 20;
+	public static final double DEFAULT_FDR_THRESHOLD = 0.05;
+	public static final double DEFAULT_FOLDCHANGE_THRESHOLD = 0.2;
+	public static final String DEFAULT_OUTPUT_FILE_NAME = "TargetSeekerResults.txt";
 
 	/*** Analysis parameters ***/
-	private static double ppmTolerance;
-	private static int missedCleavages;
-	// threshold for xCorr confidence
-	private static double xCorrScore;
-	// If this protein has confidently been IDd more than 3 times, add it to the
-	// protein, observed mass, and theoretical peptide masses to the exclusion list
-	private static final int numDB = 3;
-	private static ExclusionProfileEnum exclusionProfileType;
-
-	private static Simulator simulator;
-	private static ExclusionProfile exclusionProfile;
-
+	private static String inputFileName;
+	private static int numControlReplicates;
+	private static int numDrugReplicates;
+	private static int numOfFractions;
+	private static int kValue;
+	private static double FDRThreshold;
+	private static double foldChangeThreshold;
+	private static String outputFileName;
+	
 	public static void main(String[] args) {
-		log.info("Starting program");
-
+		System.out.println("Starting program");
 		// Parse the command line options
 		parseArguments(args);
-		// Load files necessary for program
-		loadFiles();
 		// Run simulation
-		runSimulation();
-
-		log.debug("End of program.");
-
+		execute();
+		System.out.println("End of program.");
 	}
 
-	private static void runSimulation() {
-		log.debug("Running Real Time Simulation");
-		simulator.runSimulation(exclusionProfile);
-	}
-
-	private static void loadFiles() {
-		Database database;
-		ResultDatabase resultDatabase;
-		MZMLFile mzml;
-
-		// Load the database file
-		if (digested_fasta_file_name == null) {
-			log.debug("Loading fasta and digesting the fasta file");
-			database = Loader.loadExclusionDatabase(fasta_file_name, missedCleavages);
-		} else {
-			log.debug("Loading both fasta and digested fasta file");
-			database = Loader.loadExclusionDatabase(fasta_file_name, digested_fasta_file_name);
-		}
-
-		// Load the mzml file needed for the result database and the simulator
-		mzml = Loader.parseMZML(mzml_file_name);
-
-		// Load the result database file
-		if (mzid_file_name == null && result_database_file_name == null) {
-			log.debug("No results database. Stepping through the simulation blind.");
-			resultDatabase = null;
-		} else {
-			if (result_database_file_name != null) {
-				log.debug("Loading the result database");
-				resultDatabase = Loader.parseResultDatabase(result_database_file_name);
-			} else {
-				log.debug("Creating the result database");
-				resultDatabase = Loader.loadResultDatabase(mzml, mzid_file_name);
-			}
-		}
-
-		// Load the simulator
-		log.debug("Initializing simulator");
-		simulator = new Simulator(mzml.getSpectraArray());
-
-		// Load the Exclusion Profile
-		log.debug("Initializing exclusion profile...");
-		log.debug("Exclusion profile: " + exclusionProfileType);
-		switch (exclusionProfileType) {
-		case MACHINE_LEARNING_GUIDED_EXCLUSION_PROFILE:
-			exclusionProfile = new MachineLearningGuidedExclusion(null, database); // TODO not done
-			break;
-		case NORA_EXCLUSION_PROFILE:
-			// exclusionProfile = new NoraExclusion(database, resultDatabase, xCorrScore,
-			// ppmTolerance, numDB); // TODO not
-			// done
-			break;
-		}
-
-		// simulator.test(database, resultDatabase);
+	private static void execute() {
+		System.out.println("Running TargetSeeker-MS");
+		// Run the beginning of the program (formally, the main function)
+		TargetSeekerMS targetSeekerMS = new TargetSeekerMS(inputFileName, numControlReplicates,
+				numDrugReplicates, numOfFractions, kValue, FDRThreshold, foldChangeThreshold, outputFileName);
+		targetSeekerMS.run();
 	}
 
 	private static void parseArguments(String[] args) {
@@ -119,151 +58,141 @@ public class TargetSeekerMSCommandLine {
 				// stop parsing and display help message
 				throw (new ParseException(null));
 			}
-			if (cmd.hasOption("d")) {
-				// will display debug messages to console
-				log.setLevel(Level.DEBUG);
-				log.debug("Debug mode activated");
-			} else {
-				// will not display debug messages to console
-				log.setLevel(Level.INFO);
-			}
 
 			/*** File paths ***/
-			fasta_file_name = cmd.getOptionValue("f");
-			digested_fasta_file_name = cmd.getOptionValue("g", null);
-			mzml_file_name = cmd.getOptionValue("z");
-			mzid_file_name = cmd.getOptionValue("y", null);
-			result_database_file_name = cmd.getOptionValue("r", null);
+			inputFileName = cmd.getOptionValue("i");
+			outputFileName = cmd.getOptionValue("o");
 			// checking if file paths are valid
-			if (!Loader.checkValidFilePath(fasta_file_name)) {
-				throw (new ParseException("Invalid fasta file"));
-			} else if ((digested_fasta_file_name != null) && !Loader.checkValidFilePath(digested_fasta_file_name)) {
-				throw (new ParseException("Invalid digested fasta file"));
-			} else if (!Loader.checkValidFilePath(mzml_file_name)) {
-				throw (new ParseException("Invalid mzML file"));
-			} else if ((digested_fasta_file_name != null) && !Loader.checkValidFilePath(mzid_file_name)) {
-				throw (new ParseException("Invalid mzid file"));
-			} else if ((result_database_file_name != null) && !Loader.checkValidFilePath(result_database_file_name)) {
-				throw (new ParseException("Invalid ResultDatabase file"));
-			}
+			if (!checkValidFilePath(inputFileName)) {
+				throw (new ParseException("Invalid input file!"));
+			} else if ((outputFileName != null) && !checkValidFilePath(outputFileName)) {
+				throw (new ParseException("Invalid output file!"));
+			} 
 
 			/*** Program parameters ***/
-			// missed cleavages
-			if (cmd.hasOption("n")) { // TODO is the missed cleavages necessary if you include digested file?
+			// numControlReplicates
+			if (cmd.hasOption("c")) {
 				try {
-					missedCleavages = Integer.parseInt(cmd.getOptionValue("n"));
-				} catch (NumberFormatException e) {
-					throw new ParseException("-n must be an integer");
-				}
-			} else {
-				missedCleavages = DEFAULT_MISSED_CLEAVAGES;
-			}
-
-			// exclusion profile
-			if (cmd.hasOption("e")) {
-				try {
-					switch (Integer.parseInt(cmd.getOptionValue("e"))) {
-					case 0:
-						exclusionProfileType = ExclusionProfileEnum.NORA_EXCLUSION_PROFILE;
-						break;
-					case 1:
-						exclusionProfileType = ExclusionProfileEnum.MACHINE_LEARNING_GUIDED_EXCLUSION_PROFILE;
-						break;
-					default:
-						exclusionProfileType = DEFAULT_EXCLUSION_PROFILE;
-						break;
+					numControlReplicates = Integer.parseInt(cmd.getOptionValue("c"));
+					if (numControlReplicates < 4) {
+						throw new NumberFormatException();
 					}
 				} catch (NumberFormatException e) {
-					throw new ParseException("-e must be an integer");
+					throw new ParseException("numControlReplicates must an integer greater than or equal to 4");
 				}
 			} else {
-				exclusionProfileType = DEFAULT_EXCLUSION_PROFILE;
+				numControlReplicates = DEFAULT_CONTROL_REPLICATES;
 			}
-
-			// xCorr threshold
-			if (cmd.hasOption("x")) {
+			// numDrugReplicates
+			if (cmd.hasOption("d")) {
 				try {
-					xCorrScore = Double.parseDouble(cmd.getOptionValue("x"));
+					numDrugReplicates = Integer.parseInt(cmd.getOptionValue("d"));
+					if (numDrugReplicates <= 0) {
+						throw new NumberFormatException();
+					}
 				} catch (NumberFormatException e) {
-					throw new ParseException("-x must be an double");
+					throw new ParseException("numDrugReplicates must an integer greater than 0");
 				}
 			} else {
-				xCorrScore = DEFAULT_X_CORR_SCORE;
+				numDrugReplicates = DEFAULT_DRUG_REPLICATES;
 			}
-
-			// ppmTolerance threshold
-			if (cmd.hasOption("p")) { // TODO make sure the ppm is a small number, and not like '5' or something.
+			// numOfFractions
+			if (cmd.hasOption("f")) {
 				try {
-					ppmTolerance = Double.parseDouble(cmd.getOptionValue("p"));
+					numOfFractions = Integer.parseInt(cmd.getOptionValue("f"));
+					if (numOfFractions <= 2) {
+						throw new NumberFormatException();
+					}
 				} catch (NumberFormatException e) {
-					throw new ParseException("-p must be an double");
+					throw new ParseException("numOfFractions must an integer greater than 2");
 				}
 			} else {
-				ppmTolerance = DEFAULT_PPM_TOLERANCE;
+				numOfFractions = DEFAULT_NUM_FRACTIONS;
 			}
-
+			// kValue
+			if (cmd.hasOption("k")) {
+				try {
+					kValue = Integer.parseInt(cmd.getOptionValue("k"));
+					if (kValue <= 0) {
+						throw new NumberFormatException();
+					}
+				} catch (NumberFormatException e) {
+					throw new ParseException("kValue must an integer greater than 0");
+				}
+			} else {
+				kValue = DEFAULT_KVALUE;
+			}
+			// FDRThreshold
+			if (cmd.hasOption("y")) {
+				try {
+					FDRThreshold = Double.parseDouble(cmd.getOptionValue("y"));
+					if (FDRThreshold < 0 || FDRThreshold > 1.0) {
+						throw new NumberFormatException();
+					}
+				} catch (NumberFormatException e) {
+					throw new ParseException("FDR threshold must be a number between 0 and 1");
+				}
+			} else {
+				FDRThreshold = DEFAULT_FDR_THRESHOLD;
+			}
+			// foldChangeThreshold
+			if (cmd.hasOption("z")) {
+				try {
+					foldChangeThreshold = Double.parseDouble(cmd.getOptionValue("z"));
+					if (foldChangeThreshold < 0) {
+						throw new NumberFormatException();
+					}
+				} catch (NumberFormatException e) {
+					throw new ParseException("Fold-change threshold must be a number greater than 0");
+				}
+			} else {
+				foldChangeThreshold = DEFAULT_FOLDCHANGE_THRESHOLD;
+			}
 		} catch (ParseException e) {
 			errorInArguments(e.getMessage());
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.err.println(e.getMessage());
 		}
-		log.debug("Fasta file name: " + fasta_file_name);
-		log.debug("Digested fasta file name: " + digested_fasta_file_name);
-		log.debug("mzML file name: " + mzml_file_name);
-		log.debug("mzid file name: " + mzid_file_name);
-		log.debug("Result database file name: " + result_database_file_name);
-		log.debug("ppmTolerance: " + ppmTolerance);
-		log.debug("missedCleavages: " + missedCleavages);
-		log.debug("xCorr threshold: " + xCorrScore);
-		log.debug("ExclusionProfile: " + exclusionProfileType);
+		System.out.println("inputFileName: " + inputFileName);
+		System.out.println("outputFileName: " + outputFileName);
+		System.out.println("numControlReplicates: " +numControlReplicates);
+		System.out.println("numDrugReplicates: " + numDrugReplicates);
+		System.out.println("numOfFractions: " + numOfFractions);
+		System.out.println("kValue: " + kValue);
+		System.out.println("FDRThreshold: " + FDRThreshold);
+		System.out.println("foldChangeThreshold: " + foldChangeThreshold);
 	}
 
+	public static boolean checkValidFilePath(String file_path) throws Exception {
+		return (new File(file_path).exists());
+	}
+	
 	private static void errorInArguments(String header) {
 		// automatically generate the help statement
 		HelpFormatter formatter = new HelpFormatter();
 		formatter.setOptionComparator(null);
 		if (header == null) {
-			formatter.printHelp("java -jar RealTimeMS.jar", options);
+			formatter.printHelp("java -jar TargetSeeker-MS.jar", options);
 		} else {
-			formatter.printHelp("java -jar RealTimeMS.jar", "\n************\n" + header + "\n************\n", options,
+			formatter.printHelp("java -jar TargetSeeker-MS.jar", "\n************\n" + header + "\n************\n", options,
 					"Contact Alexander Pelletier at apell035@uottawa.ca for more help");
 		}
 		System.exit(0);
 	}
 
 	private static void setupOptions() {
-		// TODO Edit descriptions. Also check if some need to be capitalized, for the
-		// options.
-		// create Options object
+		// add options	
 		options = new Options();
-
-		// add option
-		options.addOption("d", "debug", false, "Debug mode.");
-		options.addOption("e", "exclusionProfile", true, "0 - Nora Exclusion, 1 - MachineLearningGuidedMS (default).");
-		options.addOption("f", "fasta", true, "Fasta file to be used as a database.");
-		options.addOption("g", "digestedFasta", true, "Digested fasta file to be used as a database.");
 		options.addOption("h", "help", false, "Displays help options.");
-		options.addOption("n", "missedCleavages", true, "Number of missed cleavages allowed for tryptic digestion.");
-		options.addOption("o", "xCorrScore", true, "Cross correlation cuttoff threshold (depreciated)");
-		options.addOption("p", "ppmTolerance", true, "ppmTolerance allowed by the analysis.");
-		options.addOption("r", "resultDatabase", true, "Result database file (.tsv).");
-		options.addOption("y", "mzid", true, "Identification file");
-		options.addOption("z", "mzML", true, "MS experiment to be used");
-
+		options.addOption("c", "numControlReplicates", true, "number_control_replicates: the number of control replicates (integer >= 4). Default = "+DEFAULT_CONTROL_REPLICATES);
+		options.addOption("d", "numDrugReplicates", true, "number_drug_replicates: the number of drug replicates (integer > 0). Default = "+DEFAULT_DRUG_REPLICATES);
+		options.addOption("f", "numFractions", true, "the number of fractions in each replicate (integer > 2). Default = "+DEFAULT_NUM_FRACTIONS);
+		options.addOption("k", "kValue", true, "the k-nearest-neighbor smoothing factor (integer > 0). Default = "+DEFAULT_KVALUE);
+		options.addOption("y", "fdrThreshold", true, "the FDR cut-off for determining significant protein. Any proteins with an FDR higher than this threshold are considered not significant (number between 0 and 1). Default = "+DEFAULT_FDR_THRESHOLD);
+		options.addOption("z", "foldChangeThreshold", true, "the fold-change threshold for determining significant protein. Any proteins with a fold-change less than this threshold are considered not significant (non-negative number). Default = "+DEFAULT_FOLDCHANGE_THRESHOLD);
+		options.addOption("i", "inputFile", true, ".txt file containing spectral counts separated by tabs. File should follow the following naming convention for header: Protein CR1F1 CR1F2 ... DRxFy");
+		options.addOption("o", "outputFile", true, "Output the results to this file. Default = "+DEFAULT_OUTPUT_FILE_NAME);
 	}
 
-	}
-
-	public static void main(String[] args) {
-		String outputFileName = newFileName + ".txt";
-
-		String outputPathAndFile = "/home/target/tomcat/webapps/Target_Seeker/output/" + newFileName + ".txt";
-		// Create object of Main class
-		// Run the beginning of the program (formally, the main function)
-		TargetSeekerMS targetSeekerMS = new TargetSeekerMS(filePathOnServer, numControlReplicates,
-				numDrugReplicates, numOfFractions, kValue, FDRThreshold, foldChangeThreshold, outputPathAndFile);
-		targetSeekerMS.run();
-	}
-	
 }
