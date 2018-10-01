@@ -129,7 +129,10 @@ public class TargetSeekerMS {
 		// lengthOfFileExtension is the length of the appended ints
 		String[] split = file_name2.split("/");
 		String name = split[split.length - 1];
-		return name.substring(0, name.length() - lengthOfFileExtension - 1);
+		// TODO below is because of the appended numbers from the server... commented
+		// out for command line version of the tool
+		// return name.substring(0, name.length() - lengthOfFileExtension - 1);
+		return name;
 	}
 
 	public void run() {
@@ -209,7 +212,7 @@ public class TargetSeekerMS {
 				Drug[i] = new Replicate(DRUG_CONDITION, drugRepArray[i]);
 				errorHandler.put(Drug[i].toString(), false);
 				for (int j = 0; j < number_fractions; j++) {
-					String temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[i] + FRACTION_TAG + (j + 1);
+					String temp = DRUG_CONDITION + REPLICATE_TAG + drugRepArray[i] + FRACTION_TAG + (j + 1);
 					errorHandler.put(temp, false);
 					newHeader[((controlRepArray.length * number_fractions) + (number_fractions * i) + j
 							+ headerColumnsAdded.size())] = temp;
@@ -280,7 +283,7 @@ public class TargetSeekerMS {
 									temp = CONTROL_CONDITION + REPLICATE_TAG + controlRepArray[j] + FRACTION_TAG
 											+ (k + 1);
 								} else {
-									temp = DRUG_CONDITION + REPLICATE_TAG + controlRepArray[j] + FRACTION_TAG + (k + 1);
+									temp = DRUG_CONDITION + REPLICATE_TAG + drugRepArray[j] + FRACTION_TAG + (k + 1);
 								}
 								errorHandler.put(temp, true);
 							}
@@ -1009,7 +1012,7 @@ public class TargetSeekerMS {
 					numberOfCells = (jUR - jUL + 1) * (iLL - iUL + 1);
 
 					if (count == k) {
-						double weights = (double) 1.0 / ((double) (1.0 * numberOfCells));
+						double weights = 1.0 / (1.0 * numberOfCells);
 						// weighs values by how far they are from the original
 						// point in the 2d array
 						smoothedDistribution[i][j] = weights * count;
@@ -1018,8 +1021,8 @@ public class TargetSeekerMS {
 						double borderCount = count - prevCount;
 						double borderNumberCells = numberOfCells - prevNumberOfCells;
 
-						double w2 = (double) (k - prevCount) / (double) (borderCount);
-						double weights = 1.0 / ((double) (w2 * borderNumberCells) + (double) (1 * prevNumberOfCells));
+						double w2 = (k - prevCount) / (borderCount);
+						double weights = 1.0 / (w2 * borderNumberCells + 1 * prevNumberOfCells);
 						double sum = prevCount + w2 * borderCount;
 						smoothedDistribution[i][j] = weights * sum;
 						hasK = true;
